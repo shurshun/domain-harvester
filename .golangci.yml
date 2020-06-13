@@ -1,0 +1,6 @@
+run:
+  timeout: 3m
+
+linters:
+  disable:
+    - errcheck

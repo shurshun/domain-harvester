@@ -1,0 +1,8 @@
+.github
+.helm
+.git
+dist
+.gitignore
+.dockerignore
+README.*
+.goreleaser.yml

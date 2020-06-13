@@ -1,0 +1,101 @@
+image:
+  repository: shurshun/domain-harvester
+  tag: latest
+
+nameOverride: domain-harvester
+fullnameOverride: domain-harvester
+
+ports:
+  metrics:
+    port: 8081
+    labels:
+      prometheus.io/scrape: "true"
+
+configs:
+  - name: config.yml
+    path: /config.yml
+    data: |-
+      projects:
+        google:
+          - google.com
+
+env:
+  raw:
+    LOG_LEVEL: debug
+
+livenessProbe:
+  httpGet:
+    path: /_liveness
+    port: metrics
+    scheme: HTTP
+  failureThreshold: 3
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 1
+
+readinessProbe:
+  httpGet:
+    path: /_readiness
+    port: metrics
+    scheme: HTTP
+  failureThreshold: 3
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 1
+
+monitoring:
+  prometheus:
+    labels:
+      prom_rules: cluster
+      release: mon
+    groups:
+      domains:
+        DomainUpdateError:
+          annotations:
+            description: "{{$labels.source}}/{{$labels.ns}}/{{$labels.ingress}}/{{$labels.name}} can't update whois information! \n"
+            summary: DomainUpdateError
+          expr: domain_update_error > 0
+          for: 1m
+          labels:
+            severity: critical
+        DomainLastUpdate:
+          annotations:
+            description: "{{$labels.source}}/{{$labels.ns}}/{{$labels.ingress}}/{{$labels.name}} updated more than 86400 seconds ago \n"
+            summary: |
+              DomainLastUpdate
+          expr: time() - domain_last_updated > 86400
+          for: 2m
+          labels:
+            severity: warning
+        DomainExpiryWarn:
+          annotations:
+            description: "{{$labels.source}}/{{$labels.ns}}/{{$labels.ingress}}/{{$labels.name}} expires in {{ $value }} days \n"
+            summary: |
+              DomainExpiryWarn
+          expr: (domain_expiry_days < 30) and (domain_expiry_days > 14) and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: warning
+        DomainExpiryCritical:
+          annotations:
+            description: "{{$labels.source}}/{{$labels.ns}}/{{$labels.ingress}}/{{$labels.name}} expires in {{ $value }} days \n"
+            summary: |
+              DomainExpiryCritical
+          expr: (domain_expiry_days < 15) and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: critical
+
+rbac:
+  enabled: true
+  namespaced: false
+  roleRef: |
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: {{ template "go-app.fullname" . }}
+  rules:
+    - apiGroups: ["extensions"]
+      resources: ["ingresses"]
+      verbs: ["get", "watch", "list"]
