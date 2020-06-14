@@ -32,7 +32,7 @@ domain_whois_requests 2
 
 * **via binary**
 
-Just download and run binary according your platform https://github.com/shurshun/domain-harvester/releases
+Just download and run binary for your platform https://github.com/shurshun/domain-harvester/releases
 
 * **via docker**
 
