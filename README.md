@@ -42,10 +42,23 @@ docker run --rm -it -v ~/.kube/config:/root/.kube/config -p 8081:8081 shurshun/d
 
 * **via helm**
 
+Application could be installed using my own Helm chart [go-app](https://github.com/shurshun/go-app-chart)
+
 ```
 helm repo add shurshun https://shurshun.github.com/helm-charts
 helm repo update
 helm upgrade --install domain-harverster shurshun/go-app -f https://raw.githubusercontent.com/shurshun/domain-harvester/master/.helm/values.yaml
+```
+
+## Configuration options
+
+```
+   --kubeconfig value        Path to K8S config [optional] [$KUBECONFIG]
+   --config value, -c value  Path to config with domains [yaml] (default: "config.yml") [$CONFIG]
+   --log-level value         info/error/debug (default: "debug") [$LOG_LEVEL]
+   --metrics-addr value      Metrics addr (default: ":8081") [$METRICS_ADDR]
+   --help, -h                show help
+   --version, -v             print the version
 ```
 
 ## Support

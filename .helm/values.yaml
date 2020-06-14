@@ -47,6 +47,7 @@ readinessProbe:
 
 monitoring:
   prometheus:
+    # https://github.com/helm/charts/blob/master/stable/prometheus-operator/values.yaml#L1642
     labels:
       prom_rules: cluster
       release: mon
