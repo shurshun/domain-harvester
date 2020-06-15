@@ -1,11 +1,17 @@
 # Domain-harvester
 
 [![Release](https://img.shields.io/github/release/shurshun/domain-harvester.svg)](https://github.com/shurshun/domain-harvester/releases/latest)
+![Docker Pulls](https://img.shields.io/docker/pulls/shurshun/domain-harvester)
 [![Build](https://github.com/shurshun/domain-harvester/workflows/code_lint_build_repeat/badge.svg?tags)](https://github.com/shurshun/domain-harvester/actions?query=workflow%3Acode_lint_build_repeat)
 [![Go Report Card](https://goreportcard.com/badge/github.com/shurshun/domain-harvester)](https://goreportcard.com/report/github.com/shurshun/domain-harvester)
 [![Powered By: GoReleaser](https://img.shields.io/badge/powered%20by-goreleaser-blue.svg)](https://github.com/goreleaser)
 
 App collects domains from all Ingress resources in a Kubernetes cluster and provides its expiry information.
+
+## Domain sources
+
+* Kubernetes Ingress Resource
+* Config file
 
 ## Metrics example
 App provides 3 metrics per domain and 1 metric with total number of the requests to the whois servers.
@@ -61,6 +67,16 @@ helm upgrade --install domain-harverster shurshun/go-app -f https://raw.githubus
    --version, -v             print the version
 ```
 
+## Example of the optional config file
+
+```
+projects:
+  google:
+    - google.com
+
+```
+
 ## Support
 
 For any additional information, please, contact me via telegram [@shursh](https://t.me/shursh)
+
