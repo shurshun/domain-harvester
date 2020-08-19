@@ -1,6 +1,7 @@
 dist
 pprof.*
 .idea
+images
 
 # Helm
 *.dec

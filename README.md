@@ -1,3 +1,5 @@
+<p align="center"><img src="images/logo.png" alt="Domain-harvester Logo"></p>
+
 # Domain-harvester
 
 [![Release](https://img.shields.io/github/release/shurshun/domain-harvester.svg)](https://github.com/shurshun/domain-harvester/releases/latest)
