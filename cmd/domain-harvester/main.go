@@ -2,9 +2,10 @@ package main
 
 import (
 	"domain-harvester/internal/harvester"
+	"os"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"os"
 )
 
 var (
@@ -20,7 +21,7 @@ func init() {
 	cliApp.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:   "kubeconfig",
-			Usage:  "Path to K8S config [optional]",
+			Usage:  "Path to kubernetes config [optional]",
 			EnvVar: "KUBECONFIG",
 		},
 		cli.StringFlag{
@@ -37,8 +38,8 @@ func init() {
 		},
 		cli.StringFlag{
 			Name:   "metrics-addr",
-			Value:  ":8081",
-			Usage:  "Metrics addr",
+			Value:  ":8080",
+			Usage:  "Metrics address",
 			EnvVar: "METRICS_ADDR",
 		},
 	}

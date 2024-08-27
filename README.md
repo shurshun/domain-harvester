@@ -21,16 +21,16 @@ App provides 3 metrics per domain and 1 metric with total number of the requests
 ```
 # HELP domain_expiry_days time in days until the domain expires
 # TYPE domain_expiry_days gauge
-domain_expiry_days{ingress="google",name="google.com",ns="google",raw="google.com",source="config"} 3014
-domain_expiry_days{ingress="example",name="example.com",ns="default",raw="test.example.com",source="k8s"} 341
+domain_expiry_days{ingress="google",domain="google.com",ingress_namespace="google",fqdn="google.com",source="config"} 3014
+domain_expiry_days{ingress="example",domain="example.com",ingress_namespace="default",fqdn="test.example.com",source="cluster"} 341
 # HELP domain_last_updated last update of the domain
 # TYPE domain_last_updated gauge
-domain_last_updated{ingress="google",name="google.com",ns="google",raw="google.com",source="config"} 1.592078203e+09
-domain_last_updated{ingress="example",name="example.com"",ns="default",raw="test.example.com",source="k8s"} 1.592078203e+09
+domain_last_updated{ingress="google",domain="google.com",ingress_namespace="google",fqdn="google.com",source="config"} 1.592078203e+09
+domain_last_updated{ingress="example",domain="example.com"",ingress_namespace="default",fqdn="test.example.com",source="cluster"} 1.592078203e+09
 # HELP domain_update_error error on domain update
 # TYPE domain_update_error gauge
-domain_update_error{ingress="google",name="google.com",ns="google",raw="google.com",source="config"} 0
-domain_update_error{ingress="example",name="example.com"",ns="default",raw="test.example.com",source="k8s"} 0
+domain_update_error{ingress="google",domain="google.com",ingress_namespace="google",fqdn="google.com",source="config"} 0
+domain_update_error{ingress="example",domain="example.com"",ingress_namespace="default",fqdn="test.example.com",source="cluster"} 0
 # HELP domain_whois_requests requests to the whois servers
 # TYPE domain_whois_requests counter
 domain_whois_requests 2
@@ -45,7 +45,7 @@ Just download and run binary for your platform https://github.com/shurshun/domai
 * **via docker**
 
 ```
-docker run --rm -it -v ~/.kube/config:/root/.kube/config -p 8081:8081 shurshun/domain-harvester
+docker run --rm -it -v ~/.kube/config:/root/.kube/config -p 8080:8080 shurshun/domain-harvester
 ```
 
 * **via helm**
@@ -61,10 +61,10 @@ helm upgrade --install domain-harverster shurshun/go-app -f https://raw.githubus
 ## Configuration options
 
 ```
-   --kubeconfig value        Path to K8S config [optional] [$KUBECONFIG]
+   --kubeconfig value        Path to kubernetes config [optional] [$KUBECONFIG]
    --config value, -c value  Path to config with domains [yaml] (default: "config.yml") [$CONFIG]
    --log-level value         info/error/debug (default: "debug") [$LOG_LEVEL]
-   --metrics-addr value      Metrics addr (default: ":8081") [$METRICS_ADDR]
+   --metrics-addr value      Metrics address (default: ":8080") [$METRICS_ADDR]
    --help, -h                show help
    --version, -v             print the version
 ```

@@ -57,6 +57,7 @@ func (ch *ConfigHarverster) getDomains() []*types.Domain {
 		for _, domain := range domains {
 			result = append(result, &types.Domain{
 				Name:    helpers.EffectiveTLDPlusOne(domain),
+				DisplayName: helpers.ToUnicode(helpers.EffectiveTLDPlusOne(domain)),
 				Raw:     domain,
 				Source:  source,
 				Ingress: project,

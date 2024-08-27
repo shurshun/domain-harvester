@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"golang.org/x/net/publicsuffix"
+	"golang.org/x/net/idna"
 )
 
 func EffectiveTLDPlusOne(domain string) string {
@@ -11,4 +12,11 @@ func EffectiveTLDPlusOne(domain string) string {
 	}
 
 	return tLDPlusOne
+}
+
+func ToUnicode(name string) string {
+	p := idna.New()
+	domain, _ := p.ToUnicode(name)
+
+	return domain
 }
