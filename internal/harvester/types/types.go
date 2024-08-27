@@ -1,7 +1,7 @@
 package types
 
 import (
-	whois_types "domain-harvester/pkg/whois/types"
+	whois_types "github.com/shurshun/domain-harvester/pkg/whois/types"
 )
 
 type Domain struct {

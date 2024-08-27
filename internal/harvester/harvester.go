@@ -1,11 +1,11 @@
 package harvester
 
 import (
-	"domain-harvester/internal/cache"
-	cluster_harvester "domain-harvester/internal/harvester/modules/cluster"
-	config_harvester "domain-harvester/internal/harvester/modules/config"
-	"domain-harvester/internal/metrics"
-	"domain-harvester/pkg/whois"
+	"github.com/shurshun/domain-harvester/internal/cache"
+	cluster_harvester "github.com/shurshun/domain-harvester/internal/harvester/modules/cluster"
+	config_harvester "github.com/shurshun/domain-harvester/internal/harvester/modules/config"
+	"github.com/shurshun/domain-harvester/internal/metrics"
+	"github.com/shurshun/domain-harvester/pkg/whois"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )

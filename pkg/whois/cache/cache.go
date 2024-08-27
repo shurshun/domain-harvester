@@ -1,9 +1,10 @@
 package cache
 
 import (
-	"domain-harvester/pkg/whois/types"
 	"sync"
 	"time"
+
+	"github.com/shurshun/domain-harvester/pkg/whois/types"
 )
 
 type WhoisCache struct {

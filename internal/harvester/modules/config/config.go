@@ -1,11 +1,12 @@
 package config
 
 import (
-	"domain-harvester/internal/harvester/helpers"
-	"domain-harvester/internal/harvester/types"
+	"os"
+
+	"github.com/shurshun/domain-harvester/internal/harvester/helpers"
+	"github.com/shurshun/domain-harvester/internal/harvester/types"
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
-	"os"
 	// log "github.com/sirupsen/logrus"
 )
 
@@ -56,12 +57,12 @@ func (ch *ConfigHarverster) getDomains() []*types.Domain {
 	for project, domains := range ch.config.Projects {
 		for _, domain := range domains {
 			result = append(result, &types.Domain{
-				Name:    helpers.EffectiveTLDPlusOne(domain),
+				Name:        helpers.EffectiveTLDPlusOne(domain),
 				DisplayName: helpers.ToUnicode(helpers.EffectiveTLDPlusOne(domain)),
-				Raw:     domain,
-				Source:  source,
-				Ingress: project,
-				NS:      project,
+				Raw:         domain,
+				Source:      source,
+				Ingress:     project,
+				NS:          project,
 			})
 		}
 	}

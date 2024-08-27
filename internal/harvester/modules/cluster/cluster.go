@@ -1,9 +1,9 @@
 package cluster
 
 import (
-	"domain-harvester/internal/harvester/helpers"
-	"domain-harvester/internal/harvester/types"
-	"domain-harvester/pkg/k8s"
+	"github.com/shurshun/domain-harvester/internal/harvester/helpers"
+	"github.com/shurshun/domain-harvester/internal/harvester/types"
+	"github.com/shurshun/domain-harvester/pkg/k8s"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"

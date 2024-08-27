@@ -1,8 +1,9 @@
 package main
 
 import (
-	"domain-harvester/internal/harvester"
 	"os"
+
+	"github.com/shurshun/domain-harvester/internal/harvester"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
