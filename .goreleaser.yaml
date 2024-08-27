@@ -1,0 +1,80 @@
+version: 2
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X "main.Version={{ .Tag }}"
+    main: "./cmd/domain-harvester/main.go"
+
+source:
+  enabled: false
+
+archives:
+  - format: tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+docker_manifests:
+  - name_template: ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}
+    image_templates:
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-arm64
+
+dockers:
+  - image_templates:
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-amd64
+    use: buildx
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - --pull
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/shurshun/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/shurshun/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+  - image_templates:
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-arm64
+    use: buildx
+    goos: darwin
+    goarch: arm64
+    build_flag_templates:
+      - --pull
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/shurshun/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/shurshun/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}

@@ -4,16 +4,17 @@ import (
 	"domain-harvester/internal/harvester/helpers"
 	"domain-harvester/internal/harvester/types"
 	"domain-harvester/pkg/k8s"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
-const source = "k8s"
+const source = "cluster"
 
 type ClusterHarverster struct {
 	ingressCache cache.Store
@@ -28,16 +29,18 @@ func Init(c *cli.Context, domainCache types.DomainCache) (types.Harvester, error
 		return harvester, err
 	}
 
-	watchlist := cache.NewListWatchFromClient(k8sClient.ExtensionsV1beta1().RESTClient(), "ingresses", v1.NamespaceAll, fields.Everything())
+	watchlist := cache.NewListWatchFromClient(k8sClient.NetworkingV1().RESTClient(), "ingresses", v1.NamespaceAll, fields.Everything())
 
-	iStore, iController := cache.NewInformer(
-		watchlist,
-		&v1beta1.Ingress{},
-		0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    harvester.ingressCreated,
-			UpdateFunc: harvester.ingressUpdated,
-			DeleteFunc: harvester.ingressDeleted,
+	iStore, iController := cache.NewInformerWithOptions(
+		cache.InformerOptions{
+			ListerWatcher: watchlist,
+			ObjectType:    &networkingv1.Ingress{},
+			ResyncPeriod:  0,
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    harvester.ingressCreated,
+				UpdateFunc: harvester.ingressUpdated,
+				DeleteFunc: harvester.ingressDeleted,
+			},
 		},
 	)
 
@@ -49,7 +52,7 @@ func Init(c *cli.Context, domainCache types.DomainCache) (types.Harvester, error
 }
 
 func (ch *ClusterHarverster) ingressCreated(obj interface{}) {
-	ingress := obj.(*v1beta1.Ingress)
+	ingress := obj.(*networkingv1.Ingress)
 
 	log.WithFields(log.Fields{
 		"name":   ingress.ObjectMeta.Name,
@@ -60,7 +63,7 @@ func (ch *ClusterHarverster) ingressCreated(obj interface{}) {
 }
 
 func (ch *ClusterHarverster) ingressUpdated(oldObj, newObj interface{}) {
-	ingress := newObj.(*v1beta1.Ingress)
+	ingress := newObj.(*networkingv1.Ingress)
 
 	log.WithFields(log.Fields{
 		"name":   ingress.ObjectMeta.Name,
@@ -71,7 +74,7 @@ func (ch *ClusterHarverster) ingressUpdated(oldObj, newObj interface{}) {
 }
 
 func (ch *ClusterHarverster) ingressDeleted(obj interface{}) {
-	ingress := obj.(*v1beta1.Ingress)
+	ingress := obj.(*networkingv1.Ingress)
 
 	log.WithFields(log.Fields{
 		"name":   ingress.ObjectMeta.Name,
@@ -85,15 +88,16 @@ func (ch *ClusterHarverster) getDomains() []*types.Domain {
 	var result []*types.Domain
 
 	for _, obj := range ch.ingressCache.List() {
-		ingress := obj.(*v1beta1.Ingress)
+		ingress := obj.(*networkingv1.Ingress)
 
 		for _, rule := range ingress.Spec.Rules {
 			result = append(result, &types.Domain{
-				Name:    helpers.EffectiveTLDPlusOne(rule.Host),
-				Raw:     rule.Host,
-				Source:  source,
-				Ingress: ingress.ObjectMeta.Name,
-				NS:      ingress.ObjectMeta.Namespace,
+				Name:        helpers.EffectiveTLDPlusOne(rule.Host),
+				DisplayName: helpers.ToUnicode(helpers.EffectiveTLDPlusOne(rule.Host)),
+				Raw:         rule.Host,
+				Source:      source,
+				Ingress:     ingress.ObjectMeta.Name,
+				NS:          ingress.ObjectMeta.Namespace,
 			})
 		}
 	}

@@ -5,12 +5,13 @@ import (
 )
 
 type Domain struct {
-	Name      string
-	Raw       string
-	Source    string
-	Ingress   string
-	NS        string
-	WhoisData *whois_types.WhoisData
+	Name        string
+	DisplayName string
+	Raw         string
+	Source      string
+	Ingress     string
+	NS          string
+	WhoisData   *whois_types.WhoisData
 }
 
 type Harvester interface {
