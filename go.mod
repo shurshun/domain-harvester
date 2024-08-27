@@ -13,15 +13,12 @@ require (
 	github.com/googleapis/gnostic v0.4.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
-	github.com/kr/pretty v0.2.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.13.0 // indirect
-	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/shift/whois v0.0.0-20160722035721-a6942ea71fce
 	github.com/sirupsen/logrus v1.6.0
-	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/testify v1.6.1 // indirect
 	github.com/urfave/cli v1.22.4
 	github.com/zonedb/zonedb v1.0.2782 // indirect
@@ -36,7 +33,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v2 v2.3.0
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
-	k8s.io/api v0.0.0-20191114100352-16d7abae0d2a
-	k8s.io/apimachinery v0.0.0-20191028221656-72ed19daf4bb
-	k8s.io/client-go v0.0.0-20191114101535-6c5935290e33
+	k8s.io/api v0.17.16
+	k8s.io/apimachinery v0.17.16
+	k8s.io/client-go v0.17.16
 )
