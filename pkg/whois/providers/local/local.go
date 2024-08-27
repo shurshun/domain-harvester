@@ -1,12 +1,14 @@
 package local
 
 import (
-	"domain-harvester/pkg/whois/types"
 	"fmt"
-	whois "github.com/shift/whois"
 	"math"
 	"regexp"
 	"strings"
+
+	whois "github.com/shift/whois"
+	"github.com/shurshun/domain-harvester/pkg/whois/types"
+
 	// "sync"
 	"time"
 )

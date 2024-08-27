@@ -1,9 +1,9 @@
 package whois
 
 import (
-	"domain-harvester/pkg/whois/cache"
-	"domain-harvester/pkg/whois/providers/local"
-	"domain-harvester/pkg/whois/types"
+	"github.com/shurshun/domain-harvester/pkg/whois/cache"
+	"github.com/shurshun/domain-harvester/pkg/whois/providers/local"
+	"github.com/shurshun/domain-harvester/pkg/whois/types"
 )
 
 func Init() (types.WhoisHarverster, error) {

@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"domain-harvester/internal/harvester/types"
+	"github.com/shurshun/domain-harvester/internal/harvester/types"
 
 	"github.com/prometheus/client_golang/prometheus"
 )

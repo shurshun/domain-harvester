@@ -1,8 +1,9 @@
 package cache
 
 import (
-	"domain-harvester/internal/harvester/types"
 	"sync"
+
+	"github.com/shurshun/domain-harvester/internal/harvester/types"
 )
 
 type internalCache struct {

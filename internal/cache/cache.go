@@ -1,13 +1,14 @@
 package cache
 
 import (
-	"domain-harvester/internal/harvester/types"
-	whois_types "domain-harvester/pkg/whois/types"
-	"github.com/bep/debounce"
-	log "github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/bep/debounce"
+	"github.com/shurshun/domain-harvester/internal/harvester/types"
+	whois_types "github.com/shurshun/domain-harvester/pkg/whois/types"
+	log "github.com/sirupsen/logrus"
 )
 
 type DomainCache struct {
