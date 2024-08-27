@@ -31,14 +31,16 @@ func Init(c *cli.Context, domainCache types.DomainCache) (types.Harvester, error
 
 	watchlist := cache.NewListWatchFromClient(k8sClient.NetworkingV1().RESTClient(), "ingresses", v1.NamespaceAll, fields.Everything())
 
-	iStore, iController := cache.NewInformer(
-		watchlist,
-		&networkingv1.Ingress{},
-		0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    harvester.ingressCreated,
-			UpdateFunc: harvester.ingressUpdated,
-			DeleteFunc: harvester.ingressDeleted,
+	iStore, iController := cache.NewInformerWithOptions(
+		cache.InformerOptions{
+			ListerWatcher: watchlist,
+			ObjectType:    &networkingv1.Ingress{},
+			ResyncPeriod:  0,
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    harvester.ingressCreated,
+				UpdateFunc: harvester.ingressUpdated,
+				DeleteFunc: harvester.ingressDeleted,
+			},
 		},
 	)
 
