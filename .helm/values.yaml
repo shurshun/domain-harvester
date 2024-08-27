@@ -1,6 +1,6 @@
 image:
-  repository: shurshun/domain-harvester
-  tag: latest
+  repository: ghcr.io/shurshun/domain-harvester
+  tag: "1.4.0"
 
 nameOverride: domain-harvester
 fullnameOverride: domain-harvester

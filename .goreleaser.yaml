@@ -17,7 +17,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X "main.Version={{ .Tag }}"
+      - -s -w -X "main.Version={{ .Version }}"
     main: "./cmd/domain-harvester/main.go"
 
 source:
@@ -66,7 +66,7 @@ dockers:
   - image_templates:
       - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-arm64
     use: buildx
-    goos: darwin
+    goos: linux
     goarch: arm64
     build_flag_templates:
       - --pull
