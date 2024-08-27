@@ -43,7 +43,7 @@ Just download and run binary for your platform https://github.com/shurshun/domai
 * **via docker**
 
 ```
-docker run --rm -it -v ~/.kube/config:/root/.kube/config -p 8080:8080 shurshun/domain-harvester
+docker run --rm -it -v ~/.kube/config:/root/.kube/config -p 8080:8080 ghcr.io/shurshun/domain-harvester:1.4.0
 ```
 
 * **via helm**
