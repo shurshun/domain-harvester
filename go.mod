@@ -6,7 +6,7 @@ toolchain go1.22.5
 
 require (
 	github.com/bep/debounce v1.2.0
-	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_golang v1.11.1
 	github.com/shift/whois v0.0.0-20160722035721-a6942ea71fce
 	github.com/sirupsen/logrus v1.6.0
 	github.com/urfave/cli v1.22.4
@@ -49,8 +49,8 @@ require (
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32 // indirect
 	github.com/onsi/gomega v1.33.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
-	github.com/prometheus/common v0.13.0 // indirect
-	github.com/prometheus/procfs v0.1.3 // indirect
+	github.com/prometheus/common v0.26.0 // indirect
+	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
