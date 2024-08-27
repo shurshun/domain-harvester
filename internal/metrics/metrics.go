@@ -5,6 +5,7 @@ import (
 	"net/http/pprof"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/shurshun/domain-harvester/internal/harvester/types"
 	log "github.com/sirupsen/logrus"
@@ -35,7 +36,7 @@ func Init(c *cli.Context, domainCache types.DomainCache) error {
              </html>`))
 	})
 
-	prometheus.MustRegister(prometheus.NewBuildInfoCollector())
+	prometheus.MustRegister(collectors.NewBuildInfoCollector())
 	prometheus.MustRegister(NewDomainExporter(domainCache))
 
 	log.Infof("ready to handle requests at %s", c.String("metrics-addr"))
