@@ -91,6 +91,15 @@ func (ch *ClusterHarverster) getDomains() []*types.Domain {
 		ingress := obj.(*networkingv1.Ingress)
 
 		for _, rule := range ingress.Spec.Rules {
+			if rule.Host == "" {
+				log.WithFields(log.Fields{
+					"name":   ingress.ObjectMeta.Name,
+					"action": "skip",
+				}).Debug("Ingress rule has no host")
+				
+				continue
+			}
+
 			result = append(result, &types.Domain{
 				Name:        helpers.EffectiveTLDPlusOne(rule.Host),
 				DisplayName: helpers.ToUnicode(helpers.EffectiveTLDPlusOne(rule.Host)),
