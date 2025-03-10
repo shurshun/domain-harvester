@@ -1,6 +1,7 @@
 module github.com/shurshun/domain-harvester
 
 go 1.22.5
+toolchain go1.23.7
 
 require (
 	github.com/bep/debounce v1.2.1
@@ -8,7 +9,7 @@ require (
 	github.com/shift/whois v0.0.0-20160722035721-a6942ea71fce
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli v1.22.16
-	golang.org/x/net v0.35.0
+	golang.org/x/net v0.37.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
@@ -53,9 +54,9 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zonedb/zonedb v1.0.4818 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/term v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
