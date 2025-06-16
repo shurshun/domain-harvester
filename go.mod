@@ -7,7 +7,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/shift/whois v0.0.0-20160722035721-a6942ea71fce
 	github.com/sirupsen/logrus v1.9.3
-	github.com/urfave/cli v1.22.16
+	github.com/urfave/cli v1.22.17
 	golang.org/x/net v0.41.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.33.1
@@ -20,7 +20,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/domainr/whoistest v0.0.0-20240826103427-f811a0715270 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
