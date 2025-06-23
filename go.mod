@@ -10,9 +10,9 @@ require (
 	github.com/urfave/cli v1.22.16
 	golang.org/x/net v0.41.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.33.1
-	k8s.io/apimachinery v0.33.1
-	k8s.io/client-go v0.33.1
+	k8s.io/api v0.33.2
+	k8s.io/apimachinery v0.33.2
+	k8s.io/client-go v0.33.2
 )
 
 require (
