@@ -64,6 +64,21 @@ docker_manifests:
       - ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-amd64
       - ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-arm64
 
+docker_signs:
+  # cosign v3 stores this as a Sigstore bundle under a bare
+  # ghcr.io/OWNER/domain-harvester:sha256-<digest> tag (no ".sig" suffix —
+  # that's the pre-v3 convention). `crane manifest` on that tag shows an
+  # artifactType of application/vnd.dev.sigstore.bundle.v0.3+json with a
+  # `subject` pointing back at the signed manifest; that's the real
+  # signature, not a stray/leftover object.
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - "sign"
+      - "--yes"
+      - "${artifact}"
+
 dockers:
   - image_templates:
       - ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-amd64

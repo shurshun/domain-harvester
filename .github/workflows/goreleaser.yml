@@ -111,31 +111,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign and attach an SBOM to the container images
-        # cosign sign called directly, with its real output visible: the
-        # equivalent goreleaser `docker_signs` config reported success while
-        # actually never pushing a signature (goreleaser only surfaces a
-        # curated subset of cosign's own log lines, which hid that).
+      - name: Attach an SBOM to the container image
+        # goreleaser's docker_signs already covers signing (artifacts: manifests).
         env:
           TAG: ${{ github.ref_name }}
         run: |
           VERSION=${TAG#v} # goreleaser tags images without the leading 'v'
-          MAJOR_MINOR=$(cut -d. -f1,2 <<< "$VERSION")
-          REPO="ghcr.io/${{ github.repository_owner }}/domain-harvester"
-
-          for tag in "$VERSION" "$MAJOR_MINOR" latest; do
-            # cosign v3 defaults to storing signatures as an OCI 1.1
-            # referring artifact; ghcr.io's referrers API 404s for this
-            # repo, so that push silently never becomes retrievable even
-            # though `cosign sign` reports success. Force the legacy
-            # tag-based scheme instead, and verify it actually landed so a
-            # future regression here fails loudly rather than silently.
-            cosign sign --yes --registry-referrers-mode=legacy "$REPO:$tag"
-            cosign verify --registry-referrers-mode=legacy --certificate-identity-regexp=".*" --certificate-oidc-issuer-regexp=".*" "$REPO:$tag" > /dev/null
-          done
-
-          syft "$REPO:$VERSION" -o spdx-json > sbom.spdx.json
-          cosign attach sbom --sbom sbom.spdx.json "$REPO:$VERSION"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/domain-harvester:$VERSION"
+          syft "$IMAGE" -o spdx-json > sbom.spdx.json
+          cosign attach sbom --sbom sbom.spdx.json "$IMAGE"
 
       - name: Package and push the Helm chart
         # helm has its own OCI credential store, separate from the docker
