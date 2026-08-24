@@ -56,7 +56,13 @@ docker run --rm -it -v ~/.kube/config:/root/.kube/config -p 8080:8080 ghcr.io/sh
 
 * **via helm**
 
-The maintained chart lives in this repo, at `charts/domain-harvester`:
+The maintained chart lives in this repo, at `charts/domain-harvester`, and is also published as an OCI artifact on every release:
+
+```
+helm upgrade --install domain-harvester oci://ghcr.io/shurshun/charts/domain-harvester --version 1.9.0
+```
+
+or straight from a checkout:
 
 ```
 helm upgrade --install domain-harvester ./charts/domain-harvester
