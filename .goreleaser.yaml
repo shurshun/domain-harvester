@@ -41,6 +41,12 @@ changelog:
       - "^docs:"
       - "^test:"
 
+release:
+  # Lets re-running a release for a tag whose GitHub Release partially
+  # published (e.g. a later step in the CI job failed) re-upload the same
+  # assets instead of erroring on "asset already exists".
+  replace_existing_artifacts: true
+
 sboms:
   - artifacts: archive
 
