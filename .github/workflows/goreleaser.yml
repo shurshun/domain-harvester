@@ -9,14 +9,12 @@ on:
     paths-ignore:
       - 'charts/**'
       - 'deploy/**'
-      - '.helm/**'
       - 'config.yml'
       - 'README.md'
   pull_request:
     paths-ignore:
       - 'charts/**'
       - 'deploy/**'
-      - '.helm/**'
       - 'config.yml'
       - 'README.md'
 
