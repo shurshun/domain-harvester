@@ -101,6 +101,13 @@ jobs:
         # job above.
         run: kubectl kustomize deploy/kustomize/overlays/${{ matrix.overlay }} > ${{ matrix.overlay }}.yaml
       - name: Validate rendered manifests
+        # overlays/prod carries ServiceMonitor/PrometheusRule CRDs; the
+        # community catalog schema-location is what lets kubeconform
+        # validate those (same as the chart job above).
         uses: docker://ghcr.io/yannh/kubeconform:latest
         with:
-          args: -strict -summary ${{ matrix.overlay }}.yaml
+          args: >-
+            -strict -summary
+            -schema-location default
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            ${{ matrix.overlay }}.yaml
