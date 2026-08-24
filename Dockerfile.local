@@ -1,7 +1,7 @@
 # Self-contained build from source, for local development:
 #   docker build -f Dockerfile.local -t domain-harvester:dev .
 # The release image (Dockerfile) instead copies a goreleaser-built binary.
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 
 WORKDIR /src
 
