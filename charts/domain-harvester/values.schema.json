@@ -124,9 +124,18 @@
         "enabled": { "type": "boolean" },
         "labels": { "type": "object" },
         "annotations": { "type": "object" },
+        "interval": { "type": "string", "pattern": "^([0-9]+(ms|s|m|h))*$" },
         "nearExpiryDays": { "type": "integer", "minimum": 0 },
         "criticalExpiryDays": { "type": "integer", "minimum": 0 },
-        "staleAfterSeconds": { "type": "integer", "minimum": 0 }
+        "staleAfterSeconds": { "type": "integer", "minimum": 0 },
+        "defaultRules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "additionalRules": { "type": "array", "items": { "type": "object" } }
       }
     },
     "dashboard": {

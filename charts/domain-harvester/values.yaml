@@ -148,9 +148,82 @@ prometheusRule:
   enabled: false
   labels: {}
   annotations: {}
+  # Evaluation interval for the domain-harvester rule group; empty = inherit the
+  # Prometheus global default.
+  interval: ""
   nearExpiryDays: 30
   criticalExpiryDays: 15
   staleAfterSeconds: 86400
+  defaultRules:
+    # The built-in DomainUpdateError / DomainLastUpdate / DomainExpiryWarn /
+    # DomainExpiryCritical / DomainExpired alerts. Turn off to ship only
+    # additionalRules below.
+    enabled: true
+  # Extra alert (or recording) rules appended verbatim to the same rule group.
+  # Not templated by Helm, so `{{ $labels.x }}` / `{{ $value }}` can be written
+  # as-is. The set below covers exporter-level health — cache rebuilds and
+  # outbound WHOIS/RDAP traffic — which the per-domain defaults don't touch;
+  # uncomment what you want.
+  additionalRules: []
+  # additionalRules:
+  #   # The cache rebuild loop stopped: rebuilds are unconditionally triggered
+  #   # every minute, so a timestamp this old means the loop is wedged (or the
+  #   # rebuild mutex is held by a stuck WHOIS fan-out).
+  #   - alert: DomainCacheRebuildStalled
+  #     expr: time() - domain_cache_last_rebuild_timestamp > 600
+  #     for: 5m
+  #     labels:
+  #       severity: critical
+  #     annotations:
+  #       summary: Domain cache rebuilds have stalled
+  #       description: >-
+  #         No completed cache rebuild for {{ $value | humanizeDuration }}
+  #         on {{ $labels.instance }}.
+  #   # Rebuilds run under a single mutex; a slow one delays every source's
+  #   # updates, usually because WHOIS lookups are timing out.
+  #   - alert: DomainCacheRebuildSlow
+  #     expr: domain_cache_rebuild_duration_seconds > 120
+  #     for: 10m
+  #     labels:
+  #       severity: warning
+  #     annotations:
+  #       summary: Domain cache rebuilds are slow
+  #       description: >-
+  #         Last rebuild on {{ $labels.instance }} took
+  #         {{ $value | humanizeDuration }}.
+  #   # The whois cache should keep outbound traffic to a trickle (errored
+  #   # entries retry every 15m, near-expiry every 10m, the rest hourly); a
+  #   # sustained high rate means the cache is being bypassed or everything errors.
+  #   - alert: DomainWhoisRequestRateHigh
+  #     expr: rate(domain_whois_requests[15m]) > 1
+  #     for: 30m
+  #     labels:
+  #       severity: warning
+  #     annotations:
+  #       summary: Outbound WHOIS/RDAP request rate is high
+  #       description: >-
+  #         {{ $labels.instance }} is issuing {{ $value | printf "%.2f" }}
+  #         WHOIS/RDAP requests per second.
+  #   # A source that silently stopped reporting: its series vanished entirely.
+  #   # absent() is required here — `count by (source) (...) == 0` can never fire,
+  #   # since a source with no series produces no group to compare against. Repeat
+  #   # the alert per source this release actually enables.
+  #   - alert: DomainSourceHasNoDomains
+  #     expr: absent(domain_expiry_days{source="cluster"})
+  #     for: 15m
+  #     labels:
+  #       severity: warning
+  #     annotations:
+  #       summary: A domain source reports no domains
+  #       description: Source "cluster" has no domains in the cache.
+  #   - alert: DomainHarvesterDown
+  #     expr: up{job=~".*domain-harvester.*"} == 0
+  #     for: 5m
+  #     labels:
+  #       severity: critical
+  #     annotations:
+  #       summary: domain-harvester is not scrapeable
+  #       description: "{{ $labels.instance }} has been down for 5m."
 
 dashboard:
   # Ships dashboards/domain-harvester.json as a ConfigMap, picked up by the

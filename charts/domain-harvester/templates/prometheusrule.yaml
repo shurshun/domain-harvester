@@ -1,10 +1,14 @@
 {{/*
 Alert label references below use $labels.ingress_namespace and $labels.domain,
 matching the exporter's actual metric labels (internal/metrics/exporter.go) —
-the upstream .helm/values.yaml this was ported from referenced $labels.ns and
-$labels.name, which the exporter never emits.
+the deprecated .helm/values.yaml these were ported from (removed) referenced
+$labels.ns and $labels.name, which the exporter never emits.
+
+Thresholds come from .Values.prometheusRule.*; extra alerts can be appended
+verbatim via .Values.prometheusRule.additionalRules (see values.yaml for a
+commented-out set covering cache/WHOIS health).
 */}}
-{{- if .Values.prometheusRule.enabled -}}
+{{- if and .Values.prometheusRule.enabled (or .Values.prometheusRule.defaultRules.enabled .Values.prometheusRule.additionalRules) -}}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -21,50 +25,77 @@ metadata:
 spec:
   groups:
     - name: domain-harvester
+      {{- with .Values.prometheusRule.interval }}
+      interval: {{ . }}
+      {{- end }}
       rules:
+        {{- if .Values.prometheusRule.defaultRules.enabled }}
         - alert: DomainUpdateError
           expr: domain_update_error > 0
           for: 1m
           labels:
             severity: critical
           annotations:
-            summary: DomainUpdateError
+            summary: WHOIS/RDAP lookup is failing for a domain
             description: >-
               {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
               can't update whois information!
         - alert: DomainLastUpdate
-          expr: time() - domain_last_updated > {{ .Values.prometheusRule.staleAfterSeconds }}
+          # Errored domains are covered by DomainUpdateError; excluding them here
+          # keeps a single failing lookup from firing two alerts at once.
+          expr: >-
+            (time() - domain_last_updated > {{ .Values.prometheusRule.staleAfterSeconds }})
+            and (domain_update_error == 0)
           for: 2m
           labels:
             severity: warning
           annotations:
-            summary: DomainLastUpdate
+            summary: Domain data is stale
             description: >-
               {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
               updated more than {{ .Values.prometheusRule.staleAfterSeconds }} seconds ago
         - alert: DomainExpiryWarn
           expr: >-
             (domain_expiry_days < {{ .Values.prometheusRule.nearExpiryDays }})
-            and (domain_expiry_days > {{ .Values.prometheusRule.criticalExpiryDays }})
+            and (domain_expiry_days >= {{ .Values.prometheusRule.criticalExpiryDays }})
             and (domain_update_error == 0)
           for: 2m
           labels:
             severity: warning
           annotations:
-            summary: DomainExpiryWarn
+            summary: Domain expires soon
             description: >-
               {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
               expires in {{`{{ $value }}`}} days
         - alert: DomainExpiryCritical
+          # Strictly > 0 so an already-expired domain pages as DomainExpired
+          # instead of being reported as "expires in -3 days".
           expr: >-
             (domain_expiry_days < {{ .Values.prometheusRule.criticalExpiryDays }})
+            and (domain_expiry_days > 0)
             and (domain_update_error == 0)
           for: 2m
           labels:
             severity: critical
           annotations:
-            summary: DomainExpiryCritical
+            summary: Domain expires very soon
             description: >-
               {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
               expires in {{`{{ $value }}`}} days
+        - alert: DomainExpired
+          # Negated so $value reads as days *since* expiry rather than a negative
+          # number; the comparison drops __name__ on both sides, so `and` matches.
+          expr: (-domain_expiry_days >= 0) and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Domain has expired
+            description: >-
+              {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
+              expired {{`{{ $value }}`}} days ago
+        {{- end }}
+        {{- with .Values.prometheusRule.additionalRules }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
 {{- end }}

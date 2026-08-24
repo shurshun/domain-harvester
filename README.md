@@ -35,8 +35,6 @@ helm upgrade --install domain-harvester ./charts/domain-harvester
 
 See [`charts/domain-harvester/values.yaml`](charts/domain-harvester/values.yaml) for the full set of options — RBAC scope, the optional config-file source, a `ServiceMonitor`/`PrometheusRule`, and a bundled Grafana dashboard `ConfigMap`. A plain-manifest [kustomize example](deploy/kustomize/) is also available for clusters that don't use Helm.
 
-> The `.helm/values.yaml` file at the repo root is a **deprecated** values file for an older, externally hosted chart; it's kept only for existing installs and isn't updated for new flags or metrics.
-
 ### Docker
 
 ```console
@@ -128,7 +126,7 @@ domain_cache_last_rebuild_timestamp 1.592078203e+09
 domain_cache_rebuild_duration_seconds 0.842
 ```
 
-`domain_update_error` and `domain_cache_last_rebuild_timestamp` are what the chart's bundled `PrometheusRule` alerts on — see [`charts/domain-harvester/templates/prometheusrule.yaml`](charts/domain-harvester/templates/prometheusrule.yaml).
+`domain_update_error` and `domain_cache_last_rebuild_timestamp` are what the chart's bundled `PrometheusRule` alerts on — see [`charts/domain-harvester/templates/prometheusrule.yaml`](charts/domain-harvester/templates/prometheusrule.yaml) for the built-in alerts, and `prometheusRule.additionalRules` in [`values.yaml`](charts/domain-harvester/values.yaml) for a commented-out set of exporter-health alerts to extend them with.
 
 ## Development
 

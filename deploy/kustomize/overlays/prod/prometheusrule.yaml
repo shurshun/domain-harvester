@@ -1,6 +1,7 @@
 # Label references below match what internal/metrics/exporter.go actually
 # emits (source, ingress, ingress_namespace, domain) — see
-# charts/domain-harvester for the same rules as a Helm template.
+# charts/domain-harvester for the same rules as a Helm template (plus a
+# commented-out set of exporter-health alerts in its values.yaml).
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -15,37 +16,66 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: DomainUpdateError
+            summary: WHOIS/RDAP lookup is failing for a domain
             description: >-
               {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
               can't update whois information!
         - alert: DomainLastUpdate
-          expr: time() - domain_last_updated > 86400
+          # Errored domains are covered by DomainUpdateError; excluding them here
+          # keeps a single failing lookup from firing two alerts at once.
+          expr: (time() - domain_last_updated > 86400) and (domain_update_error == 0)
           for: 2m
           labels:
             severity: warning
           annotations:
-            summary: DomainLastUpdate
+            summary: Domain data is stale
             description: >-
               {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
               updated more than 86400 seconds ago
         - alert: DomainExpiryWarn
-          expr: (domain_expiry_days < 30) and (domain_expiry_days > 14) and (domain_update_error == 0)
+          expr: (domain_expiry_days < 30) and (domain_expiry_days >= 15) and (domain_update_error == 0)
           for: 2m
           labels:
             severity: warning
           annotations:
-            summary: DomainExpiryWarn
+            summary: Domain expires soon
             description: >-
               {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
               expires in {{ $value }} days
         - alert: DomainExpiryCritical
-          expr: (domain_expiry_days < 15) and (domain_update_error == 0)
+          # Strictly > 0 so an already-expired domain pages as DomainExpired
+          # instead of being reported as "expires in -3 days".
+          expr: (domain_expiry_days < 15) and (domain_expiry_days > 0) and (domain_update_error == 0)
           for: 2m
           labels:
             severity: critical
           annotations:
-            summary: DomainExpiryCritical
+            summary: Domain expires very soon
             description: >-
               {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
               expires in {{ $value }} days
+        - alert: DomainExpired
+          # Negated so $value reads as days *since* expiry rather than a negative
+          # number; the comparison drops __name__ on both sides, so `and` matches.
+          expr: (-domain_expiry_days >= 0) and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Domain has expired
+            description: >-
+              {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
+              expired {{ $value }} days ago
+        # Exporter-level health: the cache rebuild loop runs every minute, so a
+        # stale timestamp means it is wedged (likely a stuck WHOIS fan-out
+        # holding the rebuild mutex).
+        - alert: DomainCacheRebuildStalled
+          expr: time() - domain_cache_last_rebuild_timestamp > 600
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Domain cache rebuilds have stalled
+            description: >-
+              No completed cache rebuild for {{ $value | humanizeDuration }}
+              on {{ $labels.instance }}.
