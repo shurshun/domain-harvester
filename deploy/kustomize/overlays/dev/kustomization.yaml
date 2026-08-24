@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: domain-harvester-dev
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+patches:
+  - path: deployment-patch.yaml
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/instance: dev

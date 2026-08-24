@@ -1,0 +1,16 @@
+{{- if .Values.dashboard.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "domain-harvester.fullname" . }}-dashboard
+  labels:
+    {{- include "domain-harvester.labels" . | nindent 4 }}
+    {{ .Values.dashboard.sidecarLabel }}: {{ .Values.dashboard.sidecarLabelValue | quote }}
+  {{- with .Values.dashboard.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  domain-harvester.json: |
+{{ .Files.Get "dashboards/domain-harvester.json" | indent 4 }}
+{{- end }}

@@ -1,0 +1,51 @@
+# Label references below match what internal/metrics/exporter.go actually
+# emits (source, ingress, ingress_namespace, domain) — see
+# charts/domain-harvester for the same rules as a Helm template.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: domain-harvester
+spec:
+  groups:
+    - name: domain-harvester
+      rules:
+        - alert: DomainUpdateError
+          expr: domain_update_error > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: DomainUpdateError
+            description: >-
+              {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
+              can't update whois information!
+        - alert: DomainLastUpdate
+          expr: time() - domain_last_updated > 86400
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: DomainLastUpdate
+            description: >-
+              {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
+              updated more than 86400 seconds ago
+        - alert: DomainExpiryWarn
+          expr: (domain_expiry_days < 30) and (domain_expiry_days > 14) and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: DomainExpiryWarn
+            description: >-
+              {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
+              expires in {{ $value }} days
+        - alert: DomainExpiryCritical
+          expr: (domain_expiry_days < 15) and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: DomainExpiryCritical
+            description: >-
+              {{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}
+              expires in {{ $value }} days

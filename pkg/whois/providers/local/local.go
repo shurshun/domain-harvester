@@ -1,82 +1,88 @@
+// Package local queries WHOIS servers directly over port 43 and extracts the
+// domain expiry date from the parsed response.
 package local
 
 import (
+	"errors"
 	"fmt"
 	"math"
-	"regexp"
-	"strings"
-
-	whois "github.com/shift/whois"
-	"github.com/shurshun/domain-harvester/pkg/whois/types"
-
-	// "sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/likexian/whois"
+	whoisparser "github.com/likexian/whois-parser"
+
+	"github.com/shurshun/domain-harvester/pkg/whois/types"
 )
 
-var formats = []string{
-	"2006-01-02",
-	"2006-01-02T15:04:05Z",
-	"02-Jan-2006",
-	"2006.01.02",
-	"Mon Jan 2 15:04:05 MST 2006",
-	"02/01/2006",
-	"2006-01-02 15:04:05 MST",
-	"2006/01/02",
-	"Mon Jan 2006 15:04:05",
+// DefaultTimeout bounds a single WHOIS request.
+const DefaultTimeout = 10 * time.Second
+
+// WhoisProvider is the only "real" provider: every GetDomainData call results
+// in an outbound request, so it is meant to be wrapped by pkg/whois/cache.
+type WhoisProvider struct {
+	client *whois.Client
+
+	externalRequests atomic.Uint64
 }
 
-type WhoisProvider struct {
-	regexpTime *regexp.Regexp
-	// mutex      sync.RWMutex
-	externalRequests uint64
+// New returns a provider whose requests are bounded by timeout.
+func New(timeout time.Duration) *WhoisProvider {
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+
+	client := whois.NewClient().
+		SetTimeout(timeout).
+		SetDisableStats(true)
+
+	return &WhoisProvider{client: client}
+}
+
+// GetExternalRequestsCnt reports how many outbound WHOIS requests were made.
+func (wp *WhoisProvider) GetExternalRequestsCnt() uint64 {
+	return wp.externalRequests.Load()
+}
+
+// GetDomainData always returns a non-nil WhoisData: on failure it carries the
+// error message in the Error field so the exporter can surface it as a metric.
+func (wp *WhoisProvider) GetDomainData(domain string) (*types.WhoisData, error) {
+	wd := &types.WhoisData{Domain: domain, LastUpdated: time.Now()}
+
+	wp.externalRequests.Add(1)
+
+	raw, err := wp.client.Whois(domain)
+	if err != nil {
+		return withError(wd, fmt.Errorf("whois query for %q failed: %w", domain, err))
+	}
+
+	return parse(wd, raw)
+}
+
+// parse fills wd's expiry from a raw WHOIS response. Split out from
+// GetDomainData so it can be unit-tested against fixtures without a network
+// round trip.
+func parse(wd *types.WhoisData, raw string) (*types.WhoisData, error) {
+	info, err := whoisparser.Parse(raw)
+	if err != nil {
+		if errors.Is(err, whoisparser.ErrNotFoundDomain) {
+			return withError(wd, fmt.Errorf("domain %q is not registered", wd.Domain))
+		}
+
+		return withError(wd, fmt.Errorf("cannot parse whois response for %q: %w", wd.Domain, err))
+	}
+
+	if info.Domain == nil || info.Domain.ExpirationDateInTime == nil {
+		return withError(wd, fmt.Errorf("whois response for %q carries no expiration date", wd.Domain))
+	}
+
+	wd.ExpiryDays = math.Floor(time.Until(*info.Domain.ExpirationDateInTime).Hours() / 24)
+
+	return wd, nil
 }
 
 func withError(wd *types.WhoisData, err error) (*types.WhoisData, error) {
 	wd.Error = err.Error()
 
 	return wd, err
-}
-
-func (wp *WhoisProvider) Init() {
-	wp.regexpTime, _ = regexp.Compile(`(Registry Expiry Date|paid-till|Expiration Date|Expiry.*): (.*)`)
-	wp.externalRequests = 0
-}
-
-func (wp *WhoisProvider) GetExternalRequestsCnt() uint64 {
-	return wp.externalRequests
-}
-
-func (wp *WhoisProvider) GetDomainData(domain string) (*types.WhoisData, error) {
-	wd := &types.WhoisData{Domain: domain, ExpiryDays: 0, LastUpdated: time.Now(), Error: ""}
-
-	wp.externalRequests++
-
-	req, err := whois.NewRequest(domain)
-	if err != nil {
-		return withError(wd, err)
-	}
-
-	var res *whois.Response
-
-	res, err = whois.DefaultClient.Fetch(req)
-	if err != nil {
-		return withError(wd, err)
-	}
-	result := wp.regexpTime.FindStringSubmatch(res.String())
-
-	if len(result) < 2 {
-		return withError(wd, fmt.Errorf("Don't know how to parse data: %s", res.String()))
-	}
-
-	rawDate := strings.TrimSpace(result[2])
-
-	for _, format := range formats {
-		if date, err := time.Parse(format, rawDate); err == nil {
-			wd.ExpiryDays = math.Floor(time.Until(date).Hours() / 24)
-
-			return wd, nil
-		}
-	}
-
-	return withError(wd, fmt.Errorf("Unable to parse date: %s", rawDate))
 }

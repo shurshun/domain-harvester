@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccount.yaml
+  - rbac.yaml
+  - deployment.yaml
+  - service.yaml
+
+configMapGenerator:
+  - name: domain-harvester-config
+    files:
+      - config.yml
+
+images:
+  - name: ghcr.io/shurshun/domain-harvester
+    newTag: latest
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: domain-harvester
+      app.kubernetes.io/managed-by: kustomize

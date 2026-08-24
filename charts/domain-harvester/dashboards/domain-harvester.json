@@ -1,0 +1,121 @@
+{
+  "title": "domain-harvester",
+  "uid": "domain-harvester",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "timezone": "",
+  "time": {"from": "now-6h", "to": "now"},
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Domains expiring soonest",
+      "type": "table",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "sort(domain_expiry_days)",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Domains with an update error",
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 9},
+      "targets": [
+        {"expr": "sum(domain_update_error)", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Domains expiring within 30 days",
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 9},
+      "targets": [
+        {"expr": "count(domain_expiry_days < 30 and domain_update_error == 0)", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 1}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "WHOIS/RDAP requests per minute",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 9},
+      "targets": [
+        {"expr": "rate(domain_whois_requests[5m]) * 60", "refId": "A"}
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Cache rebuild duration",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 9},
+      "targets": [
+        {"expr": "domain_cache_rebuild_duration_seconds", "refId": "A"}
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Time since last cache rebuild",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 15},
+      "targets": [
+        {"expr": "time() - domain_cache_last_rebuild_timestamp", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s"}
+      }
+    },
+    {
+      "id": 7,
+      "title": "Expiry days per domain",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 15},
+      "targets": [
+        {"expr": "domain_expiry_days", "legendFormat": "{{domain}}", "refId": "A"}
+      ]
+    }
+  ]
+}

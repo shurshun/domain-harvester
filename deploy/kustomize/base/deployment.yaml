@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domain-harvester
+spec:
+  # In-memory domain cache + a single Ingress informer: not horizontally
+  # scalable, and a rolling update briefly doubles WHOIS traffic for no
+  # benefit, so replace the pod outright instead.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: domain-harvester
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: domain-harvester
+    spec:
+      serviceAccountName: domain-harvester
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: domain-harvester
+          image: ghcr.io/shurshun/domain-harvester:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          args:
+            - --metrics-addr=:8080
+            - --config=/config.yml
+          env:
+            - name: LOG_LEVEL
+              value: info
+            - name: WHOIS_CONCURRENCY
+              value: "16"
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /_liveness
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_readiness
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config.yml
+              subPath: config.yml
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: domain-harvester-config

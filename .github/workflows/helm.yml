@@ -1,0 +1,122 @@
+name: helm
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'charts/**'
+      - 'deploy/kustomize/**'
+      - '.github/workflows/helm.yml'
+  pull_request:
+    paths:
+      - 'charts/**'
+      - 'deploy/kustomize/**'
+      - '.github/workflows/helm.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@v5
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2
+
+      - name: Lint chart
+        run: ct lint --charts charts/domain-harvester --validate-maintainers=false
+
+      - name: Template chart
+        # Every optional feature enabled so the CRD-carrying resources
+        # (ServiceMonitor, PrometheusRule, dashboard ConfigMap) actually get
+        # validated below too, not just the always-on defaults. Written
+        # inside the workspace, not /tmp: the kubeconform step below runs as
+        # a docker:// action in its own container, which only ever mounts
+        # $GITHUB_WORKSPACE — a /tmp path from this step wouldn't exist
+        # inside it.
+        run: >-
+          helm template test charts/domain-harvester
+          --set config.enabled=true
+          --set serviceMonitor.enabled=true
+          --set prometheusRule.enabled=true
+          --set dashboard.enabled=true
+          > rendered.yaml
+
+      - name: Validate rendered manifests
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          args: >-
+            -strict -summary
+            -schema-location default
+            -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+            rendered.yaml
+
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build a local image for the install test
+        run: docker build -f Dockerfile.local -t domain-harvester:ci-test .
+
+      - uses: helm/kind-action@v1.14.0
+        with:
+          cluster_name: chart-testing
+
+      - name: Load the local image into kind
+        run: kind load docker-image domain-harvester:ci-test --name chart-testing
+
+      - uses: azure/setup-helm@v5
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2
+
+      - name: Install the chart into kind
+        # charts/domain-harvester/ci/ct-values.yaml points image.* at the
+        # locally built, kind-loaded image (see its comment) rather than
+        # ghcr.io, so this doesn't depend on a published release existing.
+        run: ct install --charts charts/domain-harvester
+
+  kustomize:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        overlay: [dev, prod]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build overlay
+        # Written inside the workspace, not /tmp: see the note in the chart
+        # job above.
+        run: kubectl kustomize deploy/kustomize/overlays/${{ matrix.overlay }} > ${{ matrix.overlay }}.yaml
+      - name: Validate rendered manifests
+        # overlays/prod carries ServiceMonitor/PrometheusRule CRDs; the
+        # community catalog schema-location is what lets kubeconform
+        # validate those (same as the chart job above).
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          args: >-
+            -strict -summary
+            -schema-location default
+            -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+            ${{ matrix.overlay }}.yaml

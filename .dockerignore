@@ -6,3 +6,8 @@ dist
 .dockerignore
 README.*
 .goreleaser.yml
+charts
+deploy
+images
+*.md
+Dockerfile.local

@@ -1,13 +1,16 @@
+// Package config harvests domains from an optional YAML file. Unlike the
+// cluster source it is a static, one-shot read: a missing file is not fatal.
 package config
 
 import (
+	"fmt"
 	"os"
+
+	"github.com/urfave/cli/v3"
+	"gopkg.in/yaml.v2"
 
 	"github.com/shurshun/domain-harvester/internal/harvester/helpers"
 	"github.com/shurshun/domain-harvester/internal/harvester/types"
-	"github.com/urfave/cli"
-	"gopkg.in/yaml.v2"
-	// log "github.com/sirupsen/logrus"
 )
 
 const source = "config"
@@ -17,33 +20,25 @@ type Config struct {
 }
 
 type ConfigHarverster struct {
-	// domains     []types.Domain
 	config      Config
 	domainCache types.DomainCache
 }
 
-func Init(c *cli.Context, domainCache types.DomainCache) (types.Harvester, error) {
+// Init reads the config file once and pushes its domains into the cache.
+func Init(cmd *cli.Command, domainCache types.DomainCache) (types.Harvester, error) {
 	harvester := &ConfigHarverster{domainCache: domainCache}
 
-	configPath := c.String("config")
+	configPath := cmd.String("config")
 
-	_, err := os.Stat(configPath)
+	f, err := os.Open(configPath) //nolint:gosec // path is operator-supplied by design
 	if err != nil {
-		return harvester, err
+		return nil, fmt.Errorf("cannot open %q: %w", configPath, err)
 	}
 
-	f, err := os.Open(configPath)
-	if err != nil {
-		return harvester, err
-	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	harvester.config = Config{}
-
-	decoder := yaml.NewDecoder(f)
-	err = decoder.Decode(&harvester.config)
-	if err != nil {
-		return harvester, err
+	if err := yaml.NewDecoder(f).Decode(&harvester.config); err != nil {
+		return nil, fmt.Errorf("cannot parse %q: %w", configPath, err)
 	}
 
 	harvester.domainCache.Update(source, harvester.getDomains())
@@ -51,14 +46,25 @@ func Init(c *cli.Context, domainCache types.DomainCache) (types.Harvester, error
 	return harvester, nil
 }
 
+func (ch *ConfigHarverster) Source() string {
+	return source
+}
+
+// HasSynced is always true: Init returns only after the file has been read.
+func (ch *ConfigHarverster) HasSynced() bool {
+	return true
+}
+
 func (ch *ConfigHarverster) getDomains() []*types.Domain {
 	var result []*types.Domain
 
 	for project, domains := range ch.config.Projects {
 		for _, domain := range domains {
+			name := helpers.EffectiveTLDPlusOne(domain)
+
 			result = append(result, &types.Domain{
-				Name:        helpers.EffectiveTLDPlusOne(domain),
-				DisplayName: helpers.ToUnicode(helpers.EffectiveTLDPlusOne(domain)),
+				Name:        name,
+				DisplayName: helpers.ToUnicode(name),
 				Raw:         domain,
 				Source:      source,
 				Ingress:     project,

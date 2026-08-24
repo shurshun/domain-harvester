@@ -1,0 +1,90 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A Prometheus exporter that collects domain names from Kubernetes Ingress resources (and an optional YAML config file), resolves each to its eTLD+1, looks up expiry via RDAP (falling back to WHOIS:43), and exports `domain_expiry_days`, `domain_last_updated`, `domain_update_error` per domain plus global `domain_whois_requests`, `domain_cache_last_rebuild_timestamp`, `domain_cache_rebuild_duration_seconds` counters/gauges.
+
+## Commands
+
+```bash
+go build ./...
+go vet ./...
+golangci-lint run                       # config in .golangci.yml (v2 schema)
+go test ./...                           # add -race; CI always runs with it
+go test ./internal/cache/... -run TestUpdate_dedupesAcrossSourcesByPriority -v
+go run ./cmd/domain-harvester --kubeconfig ~/.kube/config --log-level debug
+goreleaser release --snapshot --clean   # full local dry run: build, archive, SBOM, docker images
+docker build -f Dockerfile.local -t domain-harvester:dev .   # build from source, no goreleaser needed
+helm lint charts/domain-harvester
+helm template test charts/domain-harvester
+kubectl kustomize deploy/kustomize/overlays/dev   # or overlays/prod
+kind create cluster && kind load docker-image domain-harvester:dev --name kind && ct install --charts charts/domain-harvester   # what helm.yml's install job does
+```
+
+CI is split across `.github/workflows/goreleaser.yml` (lint + test + release, gated on `refs/tags/v*`), `security.yml` (govulncheck, dependency-review), and `helm.yml` (chart lint/template validated with kubeconform, an `install` job that builds `Dockerfile.local`, loads it into a `kind` cluster, and runs `ct install` against it — `charts/domain-harvester/ci/ct-values.yaml` points `image.*` at that local image so this doesn't depend on any tag actually being published to ghcr.io, plus a `kustomize` job building both overlays). `dependabot.yml` groups `gomod` updates by `k8s`/`golang-x`/`prometheus` plus separate `github-actions` and `docker` ecosystems.
+
+`main.Version` is injected via goreleaser ldflags; the in-source default (`0.1.0`) is only what you see in local builds. `Dockerfile` expects goreleaser's pre-built binary in the build context — it will not `docker build .` on its own; use `Dockerfile.local` for that.
+
+The release image/manifest names and OCI labels in `.goreleaser.yaml`, and the SBOM step's `IMAGE` env in `goreleaser.yml`, are templated off `{{ .Env.GITHUB_REPOSITORY_OWNER }}` / `${{ github.repository_owner }}` rather than hardcoded to `shurshun` — GitHub Actions injects that var into every job automatically, so a fork's own `v*`-tag push publishes to `ghcr.io/<fork-owner>/domain-harvester` (and `oci://ghcr.io/<fork-owner>/charts/domain-harvester`) without any config changes. `docker://` actions (used for kubeconform in `helm.yml`) don't go through a shell, so their `args:` strings must not be shell-quoted — a `'...'`-wrapped URL there gets passed through literally, quotes and all.
+
+## Architecture
+
+Startup chain is `cmd/domain-harvester/main.go` → `harvester.Run` (`internal/harvester/harvester.go`), which wires four pieces in order and then blocks in `metrics.Run` (that's the app's main loop — an `http.Server` that shuts down gracefully on `ctx.Done()`, wired to `SIGINT`/`SIGTERM` in `main.go`):
+
+1. `whois.Init(ctx, ...)` — RDAP-with-WHOIS-fallback provider, wrapped in its own cache.
+2. `cache.Init(ctx, whoisProvider, ...)` — the domain cache.
+3. `cluster_harvester.Init` — Kubernetes Ingress watcher. Fatal if it fails.
+4. `config_harvester.Init` — YAML file source. **Non-fatal** by design: a missing config file logs an error and the app keeps running.
+
+CLI is `urfave/cli/v3` (`*cli.Command`, `ActionFunc(context.Context, *cli.Command) error`) — not v1/v2; flag definitions use `Sources: cli.EnvVars(...)` rather than `EnvVar:`. Every tunable (WHOIS timeouts/intervals, rebuild interval, WHOIS concurrency, pprof) is a flag in `main.go`, not a hardcoded constant.
+
+### Two independent caches
+
+These are distinct and easy to confuse:
+
+- **`pkg/whois/cache`** — a `types.WhoisHarverster` decorator over the real provider, keyed by domain. Refresh cadence is three-tiered (`Options.shouldUpdate`): errored entries retry every 15 min, entries expiring within 30 days refresh every 10 min, everything else every 60 min. This is what keeps outbound WHOIS traffic low.
+- **`internal/cache`** — the domain cache. `rawCache` is a `sync.Map` keyed by **source string** (`"cluster"`, `"config"`); each harvester overwrites its own slice wholesale via `Update(source, domains)`. `rebuildDomainCache` dedups across sources by `Domain.Name` using a configured `SourcePriority` (default `["cluster", "config"]`, ties broken alphabetically) — deliberately not `sync.Map.Range` order, which is nondeterministic. WHOIS lookups fan out with a bounded semaphore (`Options.Concurrency`, default 16) rather than one goroutine per domain unbounded.
+
+Rebuilds are triggered two ways: debounced 1s after any `Update` (`bep/debounce`, so an Ingress churn burst collapses into one rebuild), and unconditionally every 1 min by `runCacheInvalidator`. `rebuildDomainCache` holds a mutex (`rebuildMu`) for its whole body — including the WHOIS fan-out — so the debounced and periodic triggers can never run concurrently and race-publish stale data over fresh; it also clones each `*types.Domain` before attaching `WhoisData` rather than mutating the source-provided pointer, since that pointer may be the one the exporter is concurrently reading off the previously-published cache. Both were real `-race` failures during development (see `internal/cache/cache_test.go`) — don't revert either without re-running `go test -race`. Every completed rebuild (even a no-op one) stamps `lastRebuildUnix`/`lastRebuildMillis`, which back the two `domain_cache_*` metrics.
+
+Readiness (`/_readiness`) waits on every `types.Harvester.HasSynced()` plus the domain cache's own `HasSynced()`. The cache's `HasSynced()` is deliberately *not* just "rebuilds > 0": a cluster/namespace with zero Ingresses (and no config file) would never trigger a non-empty rebuild, so it also returns true once `Update` has been called at least once (`everUpdated`) and the merged view is confirmed empty — otherwise readiness would wait forever for domains that will never arrive. This is why `cluster.Init` explicitly calls `domainCache.Update(source, ...)` once via `cache.WaitForCacheSync` right after the informer syncs, even with zero Ingresses — `AddFunc` alone never fires for a source with nothing to add. Verified against a real empty `kind` cluster via `ct install`, not just unit tests (see `TestHasSynced_emptyClusterIsSyncedNotStuck`).
+
+### Domain identity
+
+`internal/harvester/helpers` defines the three name forms carried in `types.Domain` — get these right or metrics labels break:
+
+- `Name` — `publicsuffix.EffectiveTLDPlusOne(host)`. This is the WHOIS lookup key and the dedup key.
+- `Raw` — the untouched host (full FQDN from the Ingress rule, or the literal config entry) → the `fqdn` label.
+- `DisplayName` — IDN-decoded `Name` → the `domain` label.
+
+### Adding a domain source
+
+Create `internal/harvester/modules/<name>/`, declare `const source = "<name>"`, implement `types.Harvester` (`Source() string`, `HasSynced() bool`) on your harvester struct, build `[]*types.Domain` via the helpers above, and call `domainCache.Update(source, ...)` whenever your view changes. Wire it into `harvester.Run`, appending to the `harvesters` slice passed to `metrics.Run` so readiness waits on it too.
+
+The cluster module uses a client-go informer (`cache.NewInformerWithOptions` on `networkingv1` ingresses, all namespaces, `ResyncPeriod: 0`, stopped via `ctx.Done()`) and on every add/update/delete re-lists the whole informer store and pushes the full set. Ingress rules with an empty `Host` are skipped. `HasSynced()` delegates to the informer controller's own `HasSynced()`.
+
+### Adding a WHOIS/RDAP provider
+
+Implement `pkg/whois/types.WhoisHarverster` (`GetDomainData`, `GetExternalRequestsCnt`) under `pkg/whois/providers/<name>/`. The default stack, assembled in `pkg/whois/whois.go:Init`, is `chain.New(rdap.New(timeout), local.New(timeout))` wrapped in `cache.Init(...)`:
+
+- **`providers/rdap`** — the primary lookup. Queries RDAP (`github.com/openrdap/rdap`, RFC 7482/7483 — HTTPS/JSON, handles registry bootstrapping itself) and reads the `"expiration"` event from the response (`expirationDate`, factored out for fixture-based testing in `rdap_test.go`). `GetExternalRequestsCnt` sums `len(resp.HTTP)` per call (bootstrap lookups included), not a flat 1-per-domain.
+- **`providers/local`** — the fallback, for the shrinking set of TLDs without an RDAP bootstrap entry. Queries WHOIS servers directly (`github.com/likexian/whois`) and parses the response with `github.com/likexian/whois-parser`; the parsing itself is factored into a standalone `parse(wd, raw string)` function so it's testable against fixture text without a network round trip.
+- **`providers/chain`** — generic two-provider composer (`New(primary, fallback)`, not RDAP-specific): tries `primary`, and on any error retries with `fallback`. `GetExternalRequestsCnt` sums both providers'.
+
+To swap the default stack, edit `pkg/whois/whois.go:Init`; to add a third provider, either extend `chain` to a list or nest another `chain.New(...)`.
+
+### Metrics
+
+`internal/metrics/exporter.go` is a custom `prometheus.Collector` registered on its own `prometheus.NewRegistry()` (not the global default — Go/process collectors are added explicitly in `metrics.Run`). Nothing is pre-computed, `Collect` reads the domain cache live on each scrape, and it skips any domain whose `WhoisData` is still `nil` (defensive; cache rebuilds should always populate it before publishing, but a cancelled rebuild could leave it unset). Metric names come from `prometheus.BuildFQName("domain", "", ...)` (`prometheus.BuildFQName("domain", "cache", ...)` for the two rebuild-observability metrics). The two `domain_cache_*` metrics are only emitted if `domainCache` implements the unexported `rebuildObserver` interface (`LastRebuildUnix() int64`, `LastRebuildDurationSeconds() float64`) — kept out of `types.DomainCache` itself so other implementations aren't forced to carry rebuild bookkeeping specific to `internal/cache`'s design; see the type-assertion in `Collect`. The server also exposes `/_liveness`, `/_readiness`, and (only with `--enable-pprof`) the full `net/http/pprof` set on the same `--metrics-addr` listener — pprof is opt-in because that port is normally reachable cluster-wide.
+
+## Deployment
+
+Three ways to deploy, all driven by the same `ghcr.io/shurshun/domain-harvester` image:
+
+- **`charts/domain-harvester/`** — the maintained Helm chart. `values.schema.json` enforces types/enums/duration-string patterns on `values.yaml` (Helm validates the merged values against it on every `lint`/`template`/`install`); the free-form Kubernetes passthrough fields (`resources`, `affinity`, `tolerations`, probes, `*.annotations`/`*.labels`) are deliberately left untyped rather than re-declaring the whole corev1 API surface. `rbac.clusterWide` (default `true`) switches between a `ClusterRole`/`ClusterRoleBinding` (needed to watch Ingresses cluster-wide) and a namespace-scoped `Role`/`RoleBinding`. `config.enabled` (default `false`) toggles the optional YAML domain source's ConfigMap + volume mount. `serviceMonitor.enabled` / `prometheusRule.enabled` need the prometheus-operator CRDs. `dashboard.enabled` (default `false`) ships `dashboards/domain-harvester.json` as a ConfigMap labeled for the `grafana/grafana` chart's default sidecar. `replicaCount` is deliberately not meant to go above 1 — the domain cache is in-memory and per-pod, so more replicas just multiply WHOIS/RDAP traffic (the Deployment uses `strategy: Recreate` for the same reason). `charts/domain-harvester/ci/ct-values.yaml` is CI-only (see Commands above), not an example for real installs. On every `v*` tag, the `release` job in `goreleaser.yml` also packages this chart with `--version`/`--app-version` set to the tag (Chart.yaml's own `version`/`appVersion` are left alone — the override is package-time only) and `helm push`es it to `oci://ghcr.io/<owner>/charts/domain-harvester`, using a separate `helm registry login` from the docker one above since Helm keeps its own OCI credential store.
+- **`deploy/kustomize/`** — a plain-manifest example (`base/` + `overlays/{dev,prod}/`). The base's `ClusterRoleBinding` subject namespace is `default` on purpose; kustomize's namespace transformer rewrites it per overlay. `overlays/prod` also carries `ServiceMonitor`/`PrometheusRule`.
+- **`.helm/values.yaml`** — **deprecated**, explicitly marked as such in the file itself. Values file for the external `shurshun/go-app` chart; kept only for existing installs, not updated for new flags/env vars/metrics going forward. Superseded by `charts/domain-harvester`.
+
+In-cluster vs. out-of-cluster k8s auth is auto-detected in `pkg/k8s` by probing the service-account token file and `KUBERNETES_SERVICE_*` env vars.

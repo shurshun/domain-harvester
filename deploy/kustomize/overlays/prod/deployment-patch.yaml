@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domain-harvester
+spec:
+  template:
+    spec:
+      containers:
+        - name: domain-harvester
+          env:
+            - name: WHOIS_CONCURRENCY
+              value: "32"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi

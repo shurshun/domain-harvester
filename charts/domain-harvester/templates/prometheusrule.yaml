@@ -1,0 +1,70 @@
+{{/*
+Alert label references below use $labels.ingress_namespace and $labels.domain,
+matching the exporter's actual metric labels (internal/metrics/exporter.go) —
+the upstream .helm/values.yaml this was ported from referenced $labels.ns and
+$labels.name, which the exporter never emits.
+*/}}
+{{- if .Values.prometheusRule.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "domain-harvester.fullname" . }}
+  labels:
+    {{- include "domain-harvester.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.prometheusRule.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    - name: domain-harvester
+      rules:
+        - alert: DomainUpdateError
+          expr: domain_update_error > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: DomainUpdateError
+            description: >-
+              {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
+              can't update whois information!
+        - alert: DomainLastUpdate
+          expr: time() - domain_last_updated > {{ .Values.prometheusRule.staleAfterSeconds }}
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: DomainLastUpdate
+            description: >-
+              {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
+              updated more than {{ .Values.prometheusRule.staleAfterSeconds }} seconds ago
+        - alert: DomainExpiryWarn
+          expr: >-
+            (domain_expiry_days < {{ .Values.prometheusRule.nearExpiryDays }})
+            and (domain_expiry_days > {{ .Values.prometheusRule.criticalExpiryDays }})
+            and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: DomainExpiryWarn
+            description: >-
+              {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
+              expires in {{`{{ $value }}`}} days
+        - alert: DomainExpiryCritical
+          expr: >-
+            (domain_expiry_days < {{ .Values.prometheusRule.criticalExpiryDays }})
+            and (domain_update_error == 0)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: DomainExpiryCritical
+            description: >-
+              {{`{{ $labels.source }}/{{ $labels.ingress_namespace }}/{{ $labels.ingress }}/{{ $labels.domain }}`}}
+              expires in {{`{{ $value }}`}} days
+{{- end }}

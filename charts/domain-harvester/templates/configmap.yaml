@@ -1,0 +1,12 @@
+{{- if .Values.config.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "domain-harvester.fullname" . }}
+  labels:
+    {{- include "domain-harvester.labels" . | nindent 4 }}
+data:
+  config.yml: |
+    projects:
+      {{- toYaml .Values.config.projects | nindent 6 }}
+{{- end }}

@@ -1,3 +1,10 @@
+# DEPRECATED: this is a values file for the external shurshun/go-app chart,
+# kept only for existing installs that already reference it. New installs
+# should use charts/domain-harvester in this repo instead — it's maintained
+# here, self-contained, and covers everything below (RBAC, ConfigMap,
+# ServiceMonitor, PrometheusRule) plus a working Deployment/Service. This
+# file is not updated for new app flags/env vars going forward.
+
 image:
   repository: ghcr.io/shurshun/domain-harvester
   tag: "1.4.0"
@@ -97,6 +104,6 @@ rbac:
     kind: ClusterRole
     name: {{ template "go-app.fullname" . }}
   rules:
-    - apiGroups: ["extensions"]
+    - apiGroups: ["networking.k8s.io"]
       resources: ["ingresses"]
       verbs: ["get", "watch", "list"]

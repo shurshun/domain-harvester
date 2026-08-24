@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "domain-harvester.fullname" . }}
+  labels:
+    {{- include "domain-harvester.labels" . | nindent 4 }}
+spec:
+  # Not a rolling-update candidate in the usual sense: the new pod's Ingress
+  # informer and WHOIS cache both start cold, so readiness (and thus real
+  # metrics) return only after it re-syncs. Recreate avoids a window where
+  # old and new pod double up on WHOIS traffic for no benefit.
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "domain-harvester.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "domain-harvester.selectorLabels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.config.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "domain-harvester.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --metrics-addr=:{{ .Values.service.port }}
+            {{- if .Values.config.enabled }}
+            - --config=/config.yml
+            {{- end }}
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.env.logLevel | quote }}
+            - name: WHOIS_CONCURRENCY
+              value: {{ .Values.env.whoisConcurrency | quote }}
+            - name: WHOIS_TIMEOUT
+              value: {{ .Values.env.whoisTimeout | quote }}
+            - name: WHOIS_REFRESH_INTERVAL
+              value: {{ .Values.env.whoisRefreshInterval | quote }}
+            - name: WHOIS_NEAR_EXPIRY_INTERVAL
+              value: {{ .Values.env.whoisNearExpiryInterval | quote }}
+            - name: WHOIS_ERROR_RETRY_INTERVAL
+              value: {{ .Values.env.whoisErrorRetryInterval | quote }}
+            - name: REBUILD_INTERVAL
+              value: {{ .Values.env.rebuildInterval | quote }}
+            - name: ENABLE_PPROF
+              value: {{ .Values.env.enablePprof | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.config.enabled }}
+          volumeMounts:
+            - name: config
+              mountPath: /config.yml
+              subPath: config.yml
+              readOnly: true
+          {{- end }}
+      {{- if .Values.config.enabled }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "domain-harvester.fullname" . }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

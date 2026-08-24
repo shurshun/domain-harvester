@@ -2,54 +2,131 @@ name: goreleaser
 
 on:
   push:
+    branches:
+      - master
+    tags:
+      - v*
     paths-ignore:
+      - 'charts/**'
+      - 'deploy/**'
       - '.helm/**'
       - 'config.yml'
       - 'README.md'
   pull_request:
     paths-ignore:
+      - 'charts/**'
+      - 'deploy/**'
       - '.helm/**'
       - 'config.yml'
       - 'README.md'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-    - uses: actions/checkout@v4
-    - uses: golangci/golangci-lint-action@v6
-      # with:
-      #   only-new-issues: true
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test -race -coverprofile=coverage.out ./...
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage.out
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - lint
+      - test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write # cosign keyless signing
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4
+
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - uses: azure/setup-helm@v5
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-        
+
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: '~> v2'
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attach an SBOM to the container image
+        # goreleaser's docker_signs already covers signing (artifacts: manifests).
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/domain-harvester:${{ github.ref_name }}
+        run: |
+          IMAGE=${IMAGE#v} # goreleaser tags images without the leading 'v'
+          syft "$IMAGE" -o spdx-json > sbom.spdx.json
+          cosign attach sbom --sbom sbom.spdx.json "$IMAGE"
+
+      - name: Package and push the Helm chart
+        # helm has its own OCI credential store, separate from the docker
+        # login above, even though it's the same registry.
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION=${TAG#v} # chart versions don't carry the leading 'v'
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm package charts/domain-harvester --version "$VERSION" --app-version "$VERSION" --destination dist-chart
+          helm push "dist-chart/domain-harvester-$VERSION.tgz" "oci://ghcr.io/${{ github.repository_owner }}/charts"
