@@ -42,11 +42,20 @@ jobs:
         run: ct lint --charts charts/domain-harvester --validate-maintainers=false
 
       - name: Template chart
-        # Written inside the workspace, not /tmp: the kubeconform step below
-        # runs as a docker:// action in its own container, which only ever
-        # mounts $GITHUB_WORKSPACE — a /tmp path from this step wouldn't
-        # exist inside it.
-        run: helm template test charts/domain-harvester > rendered.yaml
+        # Every optional feature enabled so the CRD-carrying resources
+        # (ServiceMonitor, PrometheusRule, dashboard ConfigMap) actually get
+        # validated below too, not just the always-on defaults. Written
+        # inside the workspace, not /tmp: the kubeconform step below runs as
+        # a docker:// action in its own container, which only ever mounts
+        # $GITHUB_WORKSPACE — a /tmp path from this step wouldn't exist
+        # inside it.
+        run: >-
+          helm template test charts/domain-harvester
+          --set config.enabled=true
+          --set serviceMonitor.enabled=true
+          --set prometheusRule.enabled=true
+          --set dashboard.enabled=true
+          > rendered.yaml
 
       - name: Validate rendered manifests
         uses: docker://ghcr.io/yannh/kubeconform:latest
@@ -54,7 +63,7 @@ jobs:
           args: >-
             -strict -summary
             -schema-location default
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
             rendered.yaml
 
   install:
@@ -109,5 +118,5 @@ jobs:
           args: >-
             -strict -summary
             -schema-location default
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
             ${{ matrix.overlay }}.yaml
