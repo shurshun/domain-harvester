@@ -39,7 +39,7 @@ func DefaultOptions() Options {
 		Concurrency:      16,
 		RebuildInterval:  time.Minute,
 		DebounceInterval: time.Second,
-		SourcePriority:   []string{"cluster", "config"},
+		SourcePriority:   []string{"cluster", "config", "ingressroute", "httproute", "grpcroute"},
 	}
 }
 

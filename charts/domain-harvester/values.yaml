@@ -74,6 +74,35 @@ config:
   #   google:
   #     - google.com
 
+# Optional CRD-backed domain sources, alongside the in-cluster Ingress
+# watcher. Each is off by default and independently toggleable: enabling one
+# adds RBAC for just that CRD (see templates/rbac.yaml) and the matching
+# --enable-* flag. The app itself tolerates the CRD not actually being
+# installed even when enabled here — it logs and carries on without that
+# source rather than crashing — but there's no point granting RBAC for a
+# source you don't intend to use, hence the toggle.
+sources:
+  # Traefik's IngressRoute (traefik.io/v1alpha1); domains are the backtick-quoted
+  # hostnames in each route's `Host(...)` matcher.
+  traefikIngressRoute:
+    enabled: false
+  # Gateway API HTTPRoute (gateway.networking.k8s.io/v1); domains are spec.hostnames.
+  gatewayHTTPRoute:
+    enabled: false
+  # Gateway API GRPCRoute (gateway.networking.k8s.io/v1); domains are spec.hostnames.
+  gatewayGRPCRoute:
+    enabled: false
+  # Highest priority first: when the same domain is seen from more than one
+  # enabled source (e.g. an Ingress and an HTTPRoute both routing
+  # example.com), this decides whose Ingress/namespace labels win. Sources
+  # left out sort after everything listed here.
+  priority:
+    - cluster
+    - config
+    - ingressroute
+    - httproute
+    - grpcroute
+
 # CLI flags exposed as env vars; see `domain-harvester --help`.
 env:
   logLevel: info

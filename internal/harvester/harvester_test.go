@@ -1,6 +1,7 @@
 package harvester
 
 import (
+	"reflect"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -41,5 +42,27 @@ func TestSetLogLevel(t *testing.T) {
 
 	if log.GetLevel() != log.WarnLevel {
 		t.Errorf("setLogLevel(invalid): level = %v, want %v (the safe fallback)", log.GetLevel(), log.WarnLevel)
+	}
+}
+
+func TestParseSourcePriority(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"typical flag value", "cluster,config,ingressroute", []string{"cluster", "config", "ingressroute"}},
+		{"spaces around entries are trimmed", "cluster, config , ingressroute", []string{"cluster", "config", "ingressroute"}},
+		{"trailing comma doesn't add an empty entry", "cluster,config,", []string{"cluster", "config"}},
+		{"empty string yields nil, not [\"\"]", "", nil},
+		{"only commas yields nil", ",,", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseSourcePriority(tt.in); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseSourcePriority(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
 	}
 }

@@ -64,6 +64,31 @@
         }
       }
     },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "traefikIngressRoute": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "gatewayHTTPRoute": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "gatewayGRPCRoute": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "priority": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
     "env": {
       "type": "object",
       "additionalProperties": false,

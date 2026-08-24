@@ -13,7 +13,7 @@
 
 ## How it works
 
-- **Discovery** — a Kubernetes informer watches Ingress resources across the cluster and extracts every hostname automatically. An optional static YAML file adds domains that aren't backed by an Ingress at all.
+- **Discovery** — a Kubernetes informer watches Ingress resources across the cluster and extracts every hostname automatically. An optional static YAML file adds domains that aren't backed by an Ingress at all. Traefik `IngressRoute`, Gateway API `HTTPRoute`, and `GRPCRoute` are additional, independently opt-in sources for clusters that route through those instead of (or alongside) plain Ingress — see [Optional CRD-backed sources](#optional-crd-backed-sources) below. Every source can run at once; if the same domain shows up from more than one, `--source-priority` decides whose `ingress`/`ingress_namespace` labels win.
 - **Lookup** — each hostname is reduced to its registrable domain (`shop.example.co.uk` → `example.co.uk`) and its expiry is resolved via [RDAP](https://en.wikipedia.org/wiki/Registration_Data_Access_Protocol) first, falling back to WHOIS on port 43 for the shrinking set of TLDs without an RDAP bootstrap entry. Lookups are cached and re-checked on a schedule that tightens automatically as a domain gets closer to expiring.
 - **Export** — the result is exposed as Prometheus metrics, ready to scrape and alert on.
 
@@ -63,10 +63,30 @@ Every option is a flag with a matching environment variable:
    --whois-near-expiry-interval duration  How often a domain expiring within 30 days is re-queried (default: 10m0s) [$WHOIS_NEAR_EXPIRY_INTERVAL]
    --whois-error-retry-interval duration  How often a failed lookup is retried (default: 15m0s) [$WHOIS_ERROR_RETRY_INTERVAL]
    --rebuild-interval duration            Unconditional domain cache rebuild interval (default: 1m0s) [$REBUILD_INTERVAL]
+   --source-priority string               Comma-separated source names, highest priority first, breaking ties when the same domain comes from more than one enabled source (default: "cluster,config,ingressroute,httproute,grpcroute") [$SOURCE_PRIORITY]
    --enable-pprof                         Expose net/http/pprof on the metrics listener [$ENABLE_PPROF]
+   --enable-traefik-ingressroute          Watch Traefik IngressRoute (traefik.io/v1alpha1) for domains; non-fatal if the CRD isn't installed [$ENABLE_TRAEFIK_INGRESSROUTE]
+   --enable-gateway-httproute             Watch Gateway API HTTPRoute (gateway.networking.k8s.io/v1) for domains; non-fatal if the CRD isn't installed [$ENABLE_GATEWAY_HTTPROUTE]
+   --enable-gateway-grpcroute             Watch Gateway API GRPCRoute (gateway.networking.k8s.io/v1) for domains; non-fatal if the CRD isn't installed [$ENABLE_GATEWAY_GRPCROUTE]
    --help, -h                             show help
    --version, -v                          print the version
 ```
+
+### Optional CRD-backed sources
+
+Off by default; each needs its own flag (or the matching Helm `sources.*.enabled` value, which also adds the RBAC for it):
+
+```console
+domain-harvester --enable-traefik-ingressroute --enable-gateway-httproute --enable-gateway-grpcroute ...
+```
+
+If the corresponding CRD isn't installed, that source logs it and is skipped — the app still starts and everything else keeps working. Domains come from:
+
+| Source | CRD | Where the hostname comes from |
+|---|---|---|
+| `ingressroute` | `traefik.io/v1alpha1` `IngressRoute` | the backtick-quoted names in each route's `` Host(`...`) `` matcher |
+| `httproute` | `gateway.networking.k8s.io/v1` `HTTPRoute` | `spec.hostnames` |
+| `grpcroute` | `gateway.networking.k8s.io/v1` `GRPCRoute` | `spec.hostnames` |
 
 ### Optional config file
 

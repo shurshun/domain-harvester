@@ -49,3 +49,26 @@ Name of the service account to use.
 {{ default "default" .Values.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+RBAC rules for the optional CRD-backed domain sources, gated per-source so a
+release that enables none of them doesn't request permissions it never uses.
+Shared between the ClusterRole and Role branches of rbac.yaml.
+*/}}
+{{- define "domain-harvester.optionalSourceRules" -}}
+{{- if .Values.sources.traefikIngressRoute.enabled }}
+- apiGroups: ["traefik.io"]
+  resources: ["ingressroutes"]
+  verbs: ["get", "list", "watch"]
+{{- end }}
+{{- if .Values.sources.gatewayHTTPRoute.enabled }}
+- apiGroups: ["gateway.networking.k8s.io"]
+  resources: ["httproutes"]
+  verbs: ["get", "list", "watch"]
+{{- end }}
+{{- if .Values.sources.gatewayGRPCRoute.enabled }}
+- apiGroups: ["gateway.networking.k8s.io"]
+  resources: ["grpcroutes"]
+  verbs: ["get", "list", "watch"]
+{{- end }}
+{{- end -}}

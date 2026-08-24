@@ -93,9 +93,13 @@ jobs:
         uses: helm/chart-testing-action@v2
 
       - name: Install the chart into kind
-        # charts/domain-harvester/ci/ct-values.yaml points image.* at the
-        # locally built, kind-loaded image (see its comment) rather than
-        # ghcr.io, so this doesn't depend on a published release existing.
+        # Runs once per charts/domain-harvester/ci/*-values.yaml file:
+        # ct-values.yaml points image.* at the locally built, kind-loaded
+        # image (see its comment) rather than ghcr.io, so this doesn't
+        # depend on a published release existing; crds-absent-values.yaml
+        # additionally enables every optional CRD-backed source against a
+        # cluster that has none of those CRDs, proving that's non-fatal for
+        # real rather than only against a fake client in unit tests.
         run: ct install --charts charts/domain-harvester
 
   kustomize:

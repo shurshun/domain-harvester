@@ -62,6 +62,14 @@ spec:
               value: {{ .Values.env.rebuildInterval | quote }}
             - name: ENABLE_PPROF
               value: {{ .Values.env.enablePprof | quote }}
+            - name: ENABLE_TRAEFIK_INGRESSROUTE
+              value: {{ .Values.sources.traefikIngressRoute.enabled | quote }}
+            - name: ENABLE_GATEWAY_HTTPROUTE
+              value: {{ .Values.sources.gatewayHTTPRoute.enabled | quote }}
+            - name: ENABLE_GATEWAY_GRPCROUTE
+              value: {{ .Values.sources.gatewayGRPCRoute.enabled | quote }}
+            - name: SOURCE_PRIORITY
+              value: {{ .Values.sources.priority | join "," | quote }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

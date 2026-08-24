@@ -1,0 +1,18 @@
+# Used by `ct install` (see .github/workflows/helm.yml), alongside
+# ct-values.yaml: proves the "CRD may not be installed" claim for real,
+# not just against a fake client in unit tests. This enables every optional
+# CRD-backed source in a kind cluster that has none of Traefik's,
+# Gateway API's CRDs installed — the app is expected to still reach Ready,
+# logging that each CRD is absent rather than crashing.
+image:
+  repository: domain-harvester
+  tag: ci-test
+  pullPolicy: Never
+
+sources:
+  traefikIngressRoute:
+    enabled: true
+  gatewayHTTPRoute:
+    enabled: true
+  gatewayGRPCRoute:
+    enabled: true
