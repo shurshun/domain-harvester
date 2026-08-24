@@ -96,11 +96,83 @@ jobs:
         # Runs once per charts/domain-harvester/ci/*-values.yaml file:
         # ct-values.yaml points image.* at the locally built, kind-loaded
         # image (see its comment) rather than ghcr.io, so this doesn't
-        # depend on a published release existing; crds-absent-values.yaml
+        # depend on a published release existing; all-sources-values.yaml
         # additionally enables every optional CRD-backed source against a
         # cluster that has none of those CRDs, proving that's non-fatal for
-        # real rather than only against a fake client in unit tests.
+        # real rather than only against a fake client in unit tests. The
+        # positive-path counterpart — those CRDs actually present, with real
+        # objects, checking the domains they carry reach /metrics — is the
+        # crds-present job below.
         run: ct install --charts charts/domain-harvester
+
+  crds-present:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build a local image for the install test
+        run: docker build -f Dockerfile.local -t domain-harvester:ci-test .
+
+      - uses: helm/kind-action@v1.14.0
+        with:
+          cluster_name: crds-present
+
+      - name: Load the local image into kind
+        run: kind load docker-image domain-harvester:ci-test --name crds-present
+
+      - uses: azure/setup-helm@v5
+
+      - name: Install the Traefik IngressRoute and Gateway API HTTPRoute/GRPCRoute CRDs
+        # Reuses the same trimmed single-CRD fixtures the envtest integration
+        # tests (test/integration) apply against, so there's one source of
+        # truth for "what CRD schema are we testing against" instead of two
+        # independently drifting copies.
+        run: kubectl apply -f test/integration/testdata/crds/
+
+      - name: Deploy sample IngressRoute/HTTPRoute/GRPCRoute test resources
+        run: kubectl apply -f charts/domain-harvester/ci/crds-present-resources.yaml
+
+      - name: Install the chart with every optional source enabled
+        # --wait's readiness gate only needs each harvester's informer to
+        # have done its initial list (fast, no CRDs missing here) plus one
+        # domain cache rebuild — it does not wait on WHOIS/RDAP lookups
+        # completing, so this returns well before the /metrics check below
+        # has anything to find yet.
+        run: >-
+          helm install domain-harvester charts/domain-harvester
+          --values charts/domain-harvester/ci/all-sources-values.yaml
+          --wait --timeout 2m
+
+      - name: Verify /metrics reports a domain harvested from each CRD source
+        # Domain metrics only appear once a cache rebuild's WHOIS/RDAP fan-out
+        # has completed for that domain (success or failure — either way
+        # domain_update_error gets a series), which happens asynchronously
+        # after the readiness gate above, hence the retry loop.
+        run: |
+          kubectl port-forward svc/domain-harvester 8080:8080 &
+          PF_PID=$!
+          trap 'kill "$PF_PID"' EXIT
+
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/metrics -o metrics.txt; then
+              if grep -q 'source="ingressroute"' metrics.txt \
+                && grep -q 'source="httproute"' metrics.txt \
+                && grep -q 'source="grpcroute"' metrics.txt; then
+                break
+              fi
+            fi
+            sleep 2
+          done
+
+          echo "--- domain_update_error series ---"
+          grep '^domain_update_error' metrics.txt || true
+
+          # Prometheus doesn't guarantee label order in the text format, so
+          # check both label values are present on the same series line
+          # without assuming which comes first.
+          grep 'domain_update_error{' metrics.txt | grep 'source="ingressroute"' | grep -q 'fqdn="traefik-test.example.com"'
+          grep 'domain_update_error{' metrics.txt | grep 'source="httproute"' | grep -q 'fqdn="httproute-test.wikipedia.org"'
+          grep 'domain_update_error{' metrics.txt | grep 'source="grpcroute"' | grep -q 'fqdn="grpcroute-test.mozilla.org"'
 
   kustomize:
     runs-on: ubuntu-latest

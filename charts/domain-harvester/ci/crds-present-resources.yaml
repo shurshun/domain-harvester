@@ -1,0 +1,32 @@
+# Sample objects for the `crds-present` job in .github/workflows/helm.yml:
+# one per optional CRD-backed source, each with a distinct real, always-
+# registered domain (different eTLD+1 per resource, so they can't collide
+# via internal/cache's cross-source dedup) so /metrics can be checked for a
+# `source="<name>"` series carrying exactly the domain that resource named.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: crds-present-test
+  namespace: default
+spec:
+  routes:
+    - kind: Rule
+      match: Host(`traefik-test.example.com`)
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: crds-present-test
+  namespace: default
+spec:
+  hostnames:
+    - httproute-test.wikipedia.org
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: crds-present-test
+  namespace: default
+spec:
+  hostnames:
+    - grpcroute-test.mozilla.org
