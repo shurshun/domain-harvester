@@ -6,6 +6,19 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
     verbs: ["get", "list", "watch"]
+  # The app's optional CRD-backed domain sources are all off by default
+  # (ENABLE_TRAEFIK_INGRESSROUTE / ENABLE_GATEWAY_HTTPROUTE /
+  # ENABLE_GATEWAY_GRPCROUTE), so RBAC for them isn't included here either —
+  # add whichever of these you actually enable:
+  # - apiGroups: ["traefik.io"]
+  #   resources: ["ingressroutes"]
+  #   verbs: ["get", "list", "watch"]
+  # - apiGroups: ["gateway.networking.k8s.io"]
+  #   resources: ["httproutes"]
+  #   verbs: ["get", "list", "watch"]
+  # - apiGroups: ["gateway.networking.k8s.io"]
+  #   resources: ["grpcroutes"]
+  #   verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

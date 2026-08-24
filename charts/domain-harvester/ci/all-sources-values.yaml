@@ -1,0 +1,21 @@
+# Enables every optional CRD-backed source. Shared by two different
+# scenarios in .github/workflows/helm.yml: the `install` job's `ct install`
+# run, against a kind cluster with none of Traefik's/Gateway API's CRDs
+# installed (proves the "CRD may not be installed" claim for real, not just
+# against a fake client in unit tests — the app is expected to still reach
+# Ready, logging that each CRD is absent rather than crashing), and the
+# `crds-present` job's plain `helm install`, against a cluster that has all
+# three CRDs and real test resources (proves domains actually get harvested
+# from them, not just that their absence is tolerated).
+image:
+  repository: domain-harvester
+  tag: ci-test
+  pullPolicy: Never
+
+sources:
+  traefikIngressRoute:
+    enabled: true
+  gatewayHTTPRoute:
+    enabled: true
+  gatewayGRPCRoute:
+    enabled: true

@@ -1,4 +1,4 @@
-// Package k8s builds a Kubernetes client, auto-detecting in-cluster vs. local.
+// Package k8s builds Kubernetes clients, auto-detecting in-cluster vs. local.
 package k8s
 
 import (
@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/urfave/cli/v3"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -14,14 +15,35 @@ import (
 
 const serviceAccountTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec // path, not a credential
 
-// Init returns an in-cluster client when running as a pod, otherwise a client
+// Init returns a typed client: in-cluster when running as a pod, otherwise
 // built from --kubeconfig or ~/.kube/config.
 func Init(cmd *cli.Command) (*kubernetes.Clientset, error) {
-	if areWeInsideACluster() {
-		return getInClusterClient()
+	config, err := buildConfig(cmd)
+	if err != nil {
+		return nil, err
 	}
 
-	return getOutClusterClient(cmd.String("kubeconfig"))
+	return kubernetes.NewForConfig(config)
+}
+
+// InitDynamic returns a dynamic client against the same cluster as Init, for
+// watching CRDs (Traefik IngressRoute, Gateway API HTTPRoute/GRPCRoute, ...)
+// that have no generated typed client in this module.
+func InitDynamic(cmd *cli.Command) (dynamic.Interface, error) {
+	config, err := buildConfig(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamic.NewForConfig(config)
+}
+
+func buildConfig(cmd *cli.Command) (*rest.Config, error) {
+	if areWeInsideACluster() {
+		return rest.InClusterConfig()
+	}
+
+	return getOutClusterConfig(cmd.String("kubeconfig"))
 }
 
 func areWeInsideACluster() bool {
@@ -32,16 +54,7 @@ func areWeInsideACluster() bool {
 		err == nil && !fi.IsDir()
 }
 
-func getInClusterClient() (*kubernetes.Clientset, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return kubernetes.NewForConfig(config)
-}
-
-func getOutClusterClient(k8sConfigPath string) (*kubernetes.Clientset, error) {
+func getOutClusterConfig(k8sConfigPath string) (*rest.Config, error) {
 	configPath := k8sConfigPath
 
 	if configPath == "" {
@@ -53,12 +66,7 @@ func getOutClusterClient(k8sConfigPath string) (*kubernetes.Clientset, error) {
 		configPath = filepath.Join(home, ".kube", "config")
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return kubernetes.NewForConfig(config)
+	return clientcmd.BuildConfigFromFlags("", configPath)
 }
 
 func homeDir() string {
