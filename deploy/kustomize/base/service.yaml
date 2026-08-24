@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: domain-harvester
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: domain-harvester
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics

@@ -14,7 +14,7 @@ App collects domains from all Ingress resources in a Kubernetes cluster and prov
 * Config file
 
 ## Metrics example
-App provides 3 metrics per domain and 1 metric with total number of the requests to the whois servers.
+App provides 3 metrics per domain, 1 metric with the total number of requests to WHOIS/RDAP servers, and 2 metrics about the domain cache's own rebuild loop.
 
 ```
 # HELP domain_expiry_days time in days until the domain expires
@@ -32,7 +32,15 @@ domain_update_error{ingress="example",domain="example.com"",ingress_namespace="d
 # HELP domain_whois_requests requests to the whois servers
 # TYPE domain_whois_requests counter
 domain_whois_requests 2
+# HELP domain_cache_last_rebuild_timestamp unix timestamp of the last completed domain cache rebuild
+# TYPE domain_cache_last_rebuild_timestamp gauge
+domain_cache_last_rebuild_timestamp 1.592078203e+09
+# HELP domain_cache_rebuild_duration_seconds wall-clock time the last domain cache rebuild took
+# TYPE domain_cache_rebuild_duration_seconds gauge
+domain_cache_rebuild_duration_seconds 0.842
 ```
+
+Domain expiry is looked up via RDAP first (RFC 7482/7483 — the HTTPS/JSON successor to WHOIS), falling back to raw WHOIS on port 43 for the shrinking set of TLDs without an RDAP bootstrap entry.
 
 ## Installation
 
@@ -48,23 +56,33 @@ docker run --rm -it -v ~/.kube/config:/root/.kube/config -p 8080:8080 ghcr.io/sh
 
 * **via helm**
 
-Application could be installed using my own Helm chart [go-app](https://github.com/shurshun/go-app-chart)
+The maintained chart lives in this repo, at `charts/domain-harvester`:
 
 ```
-helm repo add shurshun https://shurshun.github.com/helm-charts
-helm repo update
-helm upgrade --install domain-harverster shurshun/go-app -f https://raw.githubusercontent.com/shurshun/domain-harvester/master/.helm/values.yaml
+helm upgrade --install domain-harvester ./charts/domain-harvester
 ```
+
+See `charts/domain-harvester/values.yaml` for the full set of options (RBAC scope, the optional config-file source, ServiceMonitor/PrometheusRule, a bundled Grafana dashboard ConfigMap). A plain-manifest kustomize example is also available under `deploy/kustomize/`.
+
+The `.helm/values.yaml` file at the repo root is a **deprecated** values file for an older, externally hosted chart (`shurshun/go-app`); it's kept only for existing installs.
 
 ## Configuration options
 
 ```
-   --kubeconfig value        Path to kubernetes config [optional] [$KUBECONFIG]
-   --config value, -c value  Path to config with domains [yaml] (default: "config.yml") [$CONFIG]
-   --log-level value         info/error/debug (default: "debug") [$LOG_LEVEL]
-   --metrics-addr value      Metrics address (default: ":8080") [$METRICS_ADDR]
-   --help, -h                show help
-   --version, -v             print the version
+   --kubeconfig string                    Path to kubernetes config [optional] [$KUBECONFIG]
+   --config string, -c string             Path to config with domains [yaml] (default: "config.yml") [$CONFIG]
+   --log-level string                     info/error/debug (default: "debug") [$LOG_LEVEL]
+   --log-format string                    text/json (default: "text") [$LOG_FORMAT]
+   --metrics-addr string                  Metrics address (default: ":8080") [$METRICS_ADDR]
+   --whois-concurrency int                Max parallel WHOIS lookups per cache rebuild (default: 16) [$WHOIS_CONCURRENCY]
+   --whois-timeout duration               Timeout of a single WHOIS request (default: 10s) [$WHOIS_TIMEOUT]
+   --whois-refresh-interval duration      How often a healthy domain is re-queried (default: 1h0m0s) [$WHOIS_REFRESH_INTERVAL]
+   --whois-near-expiry-interval duration  How often a domain expiring within 30 days is re-queried (default: 10m0s) [$WHOIS_NEAR_EXPIRY_INTERVAL]
+   --whois-error-retry-interval duration  How often a failed lookup is retried (default: 15m0s) [$WHOIS_ERROR_RETRY_INTERVAL]
+   --rebuild-interval duration            Unconditional domain cache rebuild interval (default: 1m0s) [$REBUILD_INTERVAL]
+   --enable-pprof                         Expose net/http/pprof on the metrics listener [$ENABLE_PPROF]
+   --help, -h                             show help
+   --version, -v                          print the version
 ```
 
 ## Example of the optional config file

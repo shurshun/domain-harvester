@@ -1,0 +1,132 @@
+image:
+  repository: ghcr.io/shurshun/domain-harvester
+  # Defaults to .Chart.AppVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# The domain cache lives in memory and every replica watches the whole
+# cluster independently, so running more than one just multiplies WHOIS
+# traffic without adding availability. Leave at 1 unless you're testing
+# a rolling update.
+replicaCount: 1
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+rbac:
+  create: true
+  # Discovering domains means watching Ingress across every namespace, which
+  # needs a ClusterRole/ClusterRoleBinding. Set to false to install a
+  # namespace-scoped Role/RoleBinding instead — the app will then only see
+  # Ingresses in its own namespace.
+  clusterWide: true
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+
+# The optional YAML domain source, alongside the in-cluster Ingress watcher.
+# Disabled by default: the binary's own --config default ("config.yml") does
+# not exist in the image, so leaving this off just means the app logs one
+# harmless "can't load config file" line and runs on Ingress-discovered
+# domains only.
+config:
+  enabled: false
+  projects: {}
+  # projects:
+  #   google:
+  #     - google.com
+
+# CLI flags exposed as env vars; see `domain-harvester --help`.
+env:
+  logLevel: info
+  whoisConcurrency: 16
+  whoisTimeout: 10s
+  whoisRefreshInterval: 60m
+  whoisNearExpiryInterval: 10m
+  whoisErrorRetryInterval: 15m
+  rebuildInterval: 1m
+  enablePprof: false
+
+# Extra env vars appended as-is, e.g. for a proxy: [{name: HTTPS_PROXY, value: ...}]
+extraEnv: []
+
+livenessProbe:
+  httpGet:
+    path: /_liveness
+    port: metrics
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 1
+
+readinessProbe:
+  httpGet:
+    path: /_readiness
+    port: metrics
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 1
+
+serviceMonitor:
+  # Requires the prometheus-operator CRDs.
+  enabled: false
+  interval: 30s
+  scrapeTimeout: ""
+  labels: {}
+  annotations: {}
+
+prometheusRule:
+  # Requires the prometheus-operator CRDs.
+  enabled: false
+  labels: {}
+  annotations: {}
+  nearExpiryDays: 30
+  criticalExpiryDays: 15
+  staleAfterSeconds: 86400
+
+dashboard:
+  # Ships dashboards/domain-harvester.json as a ConfigMap, picked up by the
+  # grafana/grafana chart's default sidecar (grafana.sidecar.dashboards.enabled).
+  enabled: false
+  sidecarLabel: grafana_dashboard
+  sidecarLabelValue: "1"
+  annotations: {}

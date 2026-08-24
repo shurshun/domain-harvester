@@ -24,10 +24,9 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: release-drafter/release-drafter@v6
+      - uses: release-drafter/release-drafter@v7
         with:
           config-name: release_drafter.yml
-          disable-autolabeler: true
           version: ${{ github.event.inputs.version }}
           commitish: ${{ github.event.inputs.branch }}
         env:

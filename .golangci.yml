@@ -1,6 +1,51 @@
+version: "2"
+
 run:
-  timeout: 3m
+  timeout: 5m
 
 linters:
-  disable:
-    - errcheck
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - revive
+    - unconvert
+    - whitespace
+  settings:
+    gosec:
+      excludes:
+        # pprof handlers are registered on an opt-in mux, guarded by --enable-pprof
+        - G108
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/shurshun/domain-harvester
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -24,7 +24,7 @@ source:
   enabled: false
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
@@ -41,11 +41,31 @@ changelog:
       - "^docs:"
       - "^test:"
 
+sboms:
+  - artifacts: archive
+
 docker_manifests:
   - name_template: ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}
     image_templates:
       - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-amd64
       - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-arm64
+  - name_template: ghcr.io/shurshun/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}
+    image_templates:
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-arm64
+  - name_template: ghcr.io/shurshun/{{ .ProjectName }}:latest
+    image_templates:
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/shurshun/{{ .ProjectName }}:{{ .Version }}-arm64
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - "sign"
+      - "--yes"
+      - "${artifact}"
 
 dockers:
   - image_templates:

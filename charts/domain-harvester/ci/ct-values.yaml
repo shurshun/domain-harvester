@@ -1,0 +1,7 @@
+# Used by `ct install` (see .github/workflows/helm.yml): points the chart at
+# a locally built, kind-loaded image instead of pulling from ghcr.io, so the
+# install test doesn't depend on a published release existing.
+image:
+  repository: domain-harvester
+  tag: ci-test
+  pullPolicy: Never

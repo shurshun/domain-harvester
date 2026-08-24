@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domain-harvester
+spec:
+  template:
+    spec:
+      containers:
+        - name: domain-harvester
+          env:
+            - name: LOG_LEVEL
+              value: debug
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 64Mi

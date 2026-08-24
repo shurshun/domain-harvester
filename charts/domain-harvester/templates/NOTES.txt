@@ -1,0 +1,19 @@
+domain-harvester has been installed.
+
+Metrics are served at:
+
+  http://{{ include "domain-harvester.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/metrics
+
+Port-forward to check it locally:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "domain-harvester.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  curl localhost:{{ .Values.service.port }}/metrics
+
+{{- if not .Values.rbac.clusterWide }}
+
+rbac.clusterWide is false: only Ingresses in {{ .Release.Namespace }} are visible to this release.
+{{- end }}
+{{- if not .Values.serviceMonitor.enabled }}
+
+serviceMonitor.enabled is false: set it to true (with the prometheus-operator CRDs installed) to get scraped automatically.
+{{- end }}

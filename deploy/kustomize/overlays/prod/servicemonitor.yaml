@@ -1,0 +1,12 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: domain-harvester
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: domain-harvester
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
