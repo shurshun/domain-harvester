@@ -126,8 +126,15 @@ jobs:
         # Reuses the same trimmed single-CRD fixtures the envtest integration
         # tests (test/integration) apply against, so there's one source of
         # truth for "what CRD schema are we testing against" instead of two
-        # independently drifting copies.
-        run: kubectl apply -f test/integration/testdata/crds/
+        # independently drifting copies. The Established wait matters: right
+        # after a CRD is created, kubectl's RESTMapper can still race ahead
+        # of the apiserver actually registering the new REST endpoint, and
+        # applying an instance of that kind a moment too soon fails with
+        # "no matches for kind" even though the CRD apply above reported
+        # success.
+        run: |
+          kubectl apply -f test/integration/testdata/crds/
+          kubectl wait --for=condition=Established --timeout=60s -f test/integration/testdata/crds/
 
       - name: Deploy sample IngressRoute/HTTPRoute/GRPCRoute test resources
         run: kubectl apply -f charts/domain-harvester/ci/crds-present-resources.yaml
