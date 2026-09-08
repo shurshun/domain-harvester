@@ -76,7 +76,7 @@ jobs:
       - name: Build a local image for the install test
         run: docker build -f Dockerfile.local -t domain-harvester:ci-test .
 
-      - uses: helm/kind-action@v1.14.0
+      - uses: helm/kind-action@v1.15.0
         with:
           cluster_name: chart-testing
 
@@ -113,7 +113,7 @@ jobs:
       - name: Build a local image for the install test
         run: docker build -f Dockerfile.local -t domain-harvester:ci-test .
 
-      - uses: helm/kind-action@v1.14.0
+      - uses: helm/kind-action@v1.15.0
         with:
           cluster_name: crds-present
 
