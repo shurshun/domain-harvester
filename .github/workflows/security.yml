@@ -26,7 +26,8 @@ jobs:
           cache: true
       - uses: golang/govulncheck-action@v1
         with:
-          go-version-file: go.mod
+          go-version-input: '1.27.4'
+          repo-checkout: false
 
   dependency-review:
     if: github.event_name == 'pull_request'

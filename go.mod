@@ -1,14 +1,14 @@
 module github.com/shurshun/domain-harvester
 
-go 1.27.0
+go 1.27.4
 
 require (
 	github.com/bep/debounce v1.2.1
 	github.com/likexian/whois v1.15.7
 	github.com/likexian/whois-parser v1.24.21
-	github.com/openrdap/rdap v0.10.1
+	github.com/openrdap/rdap v0.10.2
 	github.com/prometheus/client_golang v1.24.1
-	github.com/sirupsen/logrus v1.10.1
+	github.com/sirupsen/logrus v1.10.2
 	github.com/urfave/cli/v3 v3.12.0
 	golang.org/x/net v0.60.0
 	gopkg.in/yaml.v2 v2.4.0
