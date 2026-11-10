@@ -2,8 +2,8 @@ apiVersion: v2
 name: domain-harvester
 description: Collects domains from Kubernetes Ingress resources (and an optional config file) and exports their WHOIS expiry as Prometheus metrics.
 type: application
-version: 2.2.1
-appVersion: "2.2.1"
+version: 2.2.2
+appVersion: "2.2.2"
 home: https://github.com/shurshun/domain-harvester
 sources:
   - https://github.com/shurshun/domain-harvester
