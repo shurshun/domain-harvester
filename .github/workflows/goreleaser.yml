@@ -1,6 +1,7 @@
 name: goreleaser
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
@@ -131,3 +132,49 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm package charts/domain-harvester --version "$VERSION" --app-version "$VERSION" --destination dist-chart
           helm push "dist-chart/domain-harvester-$VERSION.tgz" "oci://ghcr.io/${{ github.repository_owner }}/charts"
+
+      - name: Sign published Helm chart
+        env:
+          TAG: ${{ github.ref_name }}
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+        run: |
+          go install github.com/google/go-containerregistry/cmd/crane@v0.20.6
+          VERSION=${TAG#v}
+          CHART_REF="ghcr.io/$REGISTRY_OWNER/charts/domain-harvester"
+          DIGEST=$(crane digest "$CHART_REF:$VERSION")
+          cosign sign --yes "$CHART_REF@$DIGEST"
+
+      - name: Sign checksums and verify published release
+        env:
+          TAG: ${{ github.ref_name }}
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=${TAG#v}
+          NAME=${GITHUB_REPOSITORY#*/}
+          IMAGE="ghcr.io/$REGISTRY_OWNER/$NAME"
+          IDENTITY="https://github.com/$GITHUB_REPOSITORY/.github/workflows/goreleaser.yml@refs/tags/$TAG"
+          ISSUER=https://token.actions.githubusercontent.com
+          go install github.com/google/go-containerregistry/cmd/crane@v0.20.6
+          CHECKSUMS="dist/${NAME}_${VERSION}_checksums.txt"
+          test -s "$CHECKSUMS"
+          (cd dist && sha256sum -c "${NAME}_${VERSION}_checksums.txt")
+          cosign sign-blob --yes --bundle "$CHECKSUMS.sigstore.json" "$CHECKSUMS"
+          cosign verify-blob --bundle "$CHECKSUMS.sigstore.json" \
+            --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" "$CHECKSUMS"
+          gh release upload "$TAG" "$CHECKSUMS.sigstore.json" --clobber
+          mkdir -p verify-release
+          gh release download "$TAG" --dir verify-release --pattern '*.tar.gz' --pattern '*_checksums.txt' --pattern '*.sbom.json'
+          test "$(find verify-release -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 4
+          (cd verify-release && sha256sum -c "${NAME}_${VERSION}_checksums.txt")
+          crane manifest "$IMAGE:$VERSION" | jq -e '[.manifests[].platform.architecture] | contains(["amd64", "arm64"])'
+          DIGEST=$(crane digest "$IMAGE:$VERSION")
+          cosign verify --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" "$IMAGE@$DIGEST"
+          helm pull "oci://ghcr.io/$REGISTRY_OWNER/charts/$NAME" --version "$VERSION" --destination verify-release
+          CHART_REF="ghcr.io/$REGISTRY_OWNER/charts/$NAME"
+          CHART_DIGEST=$(crane digest "$CHART_REF:$VERSION")
+          cosign verify --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" "$CHART_REF@$CHART_DIGEST"
+          METADATA=$(helm show chart "verify-release/$NAME-$VERSION.tgz")
+          test "$(awk '$1 == "version:" {gsub(/"/, "", $2); print $2}' <<< "$METADATA")" = "$VERSION"
+          test "$(awk '$1 == "appVersion:" {gsub(/"/, "", $2); print $2}' <<< "$METADATA")" = "$VERSION"

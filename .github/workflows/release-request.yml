@@ -1,0 +1,66 @@
+name: release-request
+
+on:
+  push:
+    branches: [master]
+    paths: ['.github/release-version']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-request
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPOSITORY: ${{ github.repository }}
+      COMMIT: ${{ github.sha }}
+    steps:
+      - name: Wait for successful CI on the release commit
+        run: |
+          set -euo pipefail
+          for ATTEMPT in $(seq 1 120); do
+            RUNS=$(gh api --method GET "repos/$REPOSITORY/actions/runs" -f head_sha="$COMMIT" -f event=push -f per_page=100)
+            READY=true
+            for WORKFLOW in security.yml goreleaser.yml helm.yml; do
+              RUN=$(jq -c --arg path ".github/workflows/$WORKFLOW" '[.workflow_runs[] | select(.path == $path)] | sort_by(.id) | last // {}' <<< "$RUNS")
+              STATUS=$(jq -r '.status // "missing"' <<< "$RUN")
+              CONCLUSION=$(jq -r '.conclusion // "pending"' <<< "$RUN")
+              echo "$WORKFLOW: $STATUS / $CONCLUSION"
+              if [ "$STATUS" = completed ] && [ "$CONCLUSION" != success ]; then
+                echo "Refusing release after unsuccessful $WORKFLOW" >&2
+                exit 1
+              fi
+              if [ "$STATUS" != completed ]; then READY=false; fi
+            done
+            if [ "$READY" = true ]; then break; fi
+            sleep 15
+          done
+          test "$READY" = true
+
+      - name: Create release tag and start GoReleaser
+        run: |
+          set -euo pipefail
+          VERSION=$(gh api "repos/$REPOSITORY/contents/.github/release-version?ref=$COMMIT" --jq .content | base64 --decode)
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          TAG="v$VERSION"
+          NAME=${REPOSITORY#*/}
+          CHART=$(gh api "repos/$REPOSITORY/contents/charts/$NAME/Chart.yaml?ref=$COMMIT" --jq .content | base64 --decode)
+          CHART_VERSION=$(awk '$1 == "version:" {gsub(/"/, "", $2); print $2}' <<< "$CHART")
+          APP_VERSION=$(awk '$1 == "appVersion:" {gsub(/"/, "", $2); print $2}' <<< "$CHART")
+          test "$CHART_VERSION" = "$VERSION"
+          test "$APP_VERSION" = "$VERSION"
+          if EXISTING=$(gh api "repos/$REPOSITORY/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null); then
+            test "$EXISTING" = "$COMMIT"
+          else
+            gh api --method POST "repos/$REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$COMMIT"
+          fi
+          gh workflow run goreleaser.yml --repo "$REPOSITORY" --ref "$TAG"
